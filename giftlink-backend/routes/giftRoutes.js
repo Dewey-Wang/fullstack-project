@@ -7,7 +7,7 @@ router.get('/', async (req, res) => {
         const collection = db.collection('gifts');
 
         // Task 3: Fetch all gifts using the collection.find method. Chain with toArray method to convert to JSON array
-        const gifts = await collection.find().toArray();
+        const gifts = await collection.find({}).toArray();
 
         // Task 4: Return the gifts using the res.json method
         res.json(gifts);
@@ -28,7 +28,7 @@ router.get('/:id', async (req, res) => {
         const id = req.params.id;
 
         // Task 3: Find a specific gift by ID using the collection.findOne method and store in constant called gift
-        const gift = await collection.findOne({ id: new require('mongodb').ObjectId(id) });
+        const gift = await collection.findOne({ id: id });
 
         if (!gift) {
             return res.status(404).send('Gift not found');
