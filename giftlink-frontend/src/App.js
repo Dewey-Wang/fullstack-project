@@ -10,6 +10,7 @@ import './App.css';
 import Navbar from './components/Navbar/Navbar';
 import Profile from './components/Profile/Profile';
 function App() {
+  // eslint-disable-next-line no-unused-vars
   const navigate = useNavigate();
   return (
         <>
