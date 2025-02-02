@@ -23,36 +23,23 @@ jobs:
     - name: 🐳 登入 AWS ECR
       run: |
         aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
+    
+    - name: 🔧 設定 Kubeconfig
+      run: aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name giftapp-cluster
+
+    - name: ⚙️ 建立 AWS EKS 叢集（僅限第一次）
+      run: |
+        eksctl get cluster --name giftapp-cluster || eksctl create cluster --name giftapp-cluster --region ${{ secrets.AWS_REGION }} --nodegroup-name giftapp-nodes --node-type t3.medium --nodes 2
+
+    - name: ⬆️ 部署 MongoDB 到 AWS EKS
+      run: |
+        kubectl apply -f ./kubernetes/deploymongo.yml
 
     - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
       run: |
         docker build -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest ./giftlink-backend
         docker push ${{ secrets.ECR_REPO }}/giftapp-backend:latest
 
-    - name: 🏗️ 建立 Frontend Docker Image 並推送到 AWS ECR
-      run: |
-        docker build -t ${{ secrets.ECR_REPO }}/giftapp-frontend:latest ./giftlink-frontend
-        docker push ${{ secrets.ECR_REPO }}/giftapp-frontend:latest
-
-    - name: 🏗️ 建立 MongoDB Docker Image 並推送到 AWS ECR
-      run: |
-        docker build -t ${{ secrets.ECR_REPO }}/mongodb:latest ./mongodb
-        docker push ${{ secrets.ECR_REPO }}/mongodb:latest
-
-    - name: ⚙️ 建立 AWS EKS 叢集（僅限第一次）
-      run: |
-        eksctl create cluster --name giftapp-cluster --region ${{ secrets.AWS_REGION }} --nodegroup-name giftapp-nodes --node-type t3.medium --nodes 2
-
     - name: ⬆️ 部署 MongoDB 到 AWS EKS
       run: |
-        kubectl apply -f kubernetes/mongo-deployment.yml
-
-    - name: ⬆️ 部署 Backend 到 AWS EKS
-      run: |
-        sed -i "s|<ECR_IMAGE>|${{ secrets.ECR_REPO }}/giftapp-backend:latest|g" kubernetes/backend-deployment.yml
-        kubectl apply -f kubernetes/backend-deployment.yml
-
-    - name: ⬆️ 部署 Frontend 到 AWS EKS
-      run: |
-        sed -i "s|<ECR_IMAGE>|${{ secrets.ECR_REPO }}/giftapp-frontend:latest|g" kubernetes/frontend-deployment.yml
-        kubectl apply -f kubernetes/frontend-deployment.yml
+        kubectl apply -f ./kubernetes/deployment.yml
