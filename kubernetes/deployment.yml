@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: giftapp-container
-        image: giftapp-backend
+        image: ${{ secrets.ECR_REPO }}/giftapp-backend:latest
         ports:
         - containerPort: 3060
       imagePullSecrets:
@@ -28,7 +28,7 @@ kind: Service
 metadata:
   name: gift-app-service
 spec:
-  type: NodePort
+  type: LoadBalancer  # ✅ 使用 LoadBalancer 取代 NodePort
   ports:
   - port: 80
     targetPort: 3060
