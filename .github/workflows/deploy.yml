@@ -57,36 +57,36 @@ jobs:
         cd ..
 
    - name: 🔍 取得 Backend 服務 URL
-    run: |
-      echo "等待 giftapp 部署啟動..."
-      kubectl rollout status deployment giftapp --timeout=60s  # 等待 Pod 啟動
+      run: |
+        echo "等待 giftapp 部署啟動..."
+        kubectl rollout status deployment giftapp --timeout=60s  # 等待 Pod 啟動
 
-      echo "檢查 LoadBalancer..."
-      BACKEND_URL=$(kubectl get svc gift-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        echo "檢查 LoadBalancer..."
+        BACKEND_URL=$(kubectl get svc gift-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 
-      if [ -z "$BACKEND_URL" ]; then
-        echo "未找到 LoadBalancer，使用 localhost:3060"
-        BACKEND_URL="http://localhost:3060"
-        
-        # 檢查 Pod 是否 Running
-        POD_STATUS=$(kubectl get pods -l app=giftapp -o jsonpath='{.items[0].status.phase}')
-        if [ "$POD_STATUS" != "Running" ]; then
-          echo "❌ `giftapp` 服務尚未運行，請檢查 Pod 狀態"
-          kubectl get pods -o wide
-          exit 1
+        if [ -z "$BACKEND_URL" ]; then
+          echo "未找到 LoadBalancer，使用 localhost:3060"
+          BACKEND_URL="http://localhost:3060"
+          
+          # 檢查 Pod 是否 Running
+          POD_STATUS=$(kubectl get pods -l app=giftapp -o jsonpath='{.items[0].status.phase}')
+          if [ "$POD_STATUS" != "Running" ]; then
+            echo "❌ `giftapp` 服務尚未運行，請檢查 Pod 狀態"
+            kubectl get pods -o wide
+            exit 1
+          fi
+
+          # 啟動 port-forward
+          kubectl port-forward deployment.apps/giftapp 3060:3060 &
+          sleep 10  # 等待 port-forward 生效
+        else
+          BACKEND_URL="http://$BACKEND_URL"
         fi
 
-        # 啟動 port-forward
-        kubectl port-forward deployment.apps/giftapp 3060:3060 &
-        sleep 10  # 等待 port-forward 生效
-      else
-        BACKEND_URL="http://$BACKEND_URL"
-      fi
+        echo "BACKEND_URL=$BACKEND_URL"
+        echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
 
-      echo "BACKEND_URL=$BACKEND_URL"
-      echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
-
-    - name: 📝 更新 `giftlink-frontend/.env`
+    - name: 📝 更新 giftlink-frontend env
       run: |
         echo "REACT_APP_BACKEND_URL=$BACKEND_URL" > ./giftlink-frontend/.env
         cat giftlink-frontend/.env  # 確認內容是否更新成功
