@@ -10,100 +10,101 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: 🚀 檢出程式碼
-      uses: actions/checkout@v4
+      - name: 🚀 檢出程式碼
+        uses: actions/checkout@v4
 
-    - name: 🔐 設定 AWS CLI
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
-    
-    - name: 🛠 安裝 eksctl
-      run: |
-        curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-        sudo mv /tmp/eksctl /usr/local/bin
-        eksctl version  # 確認 eksctl 安裝成功
+      - name: 🔐 設定 AWS CLI
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
+      - name: 🛠 安裝 eksctl
+        run: |
+          curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
+          sudo mv /tmp/eksctl /usr/local/bin
+          eksctl version  # 確認 eksctl 安裝成功
 
-    - name: 🐳 登入 AWS ECR
-      run: |
-        aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
-    
-    - name: ⚙️ 檢查並建立 AWS EKS 叢集
-      run: |
-        eksctl get cluster --name giftapp-cluster || eksctl create cluster --name giftapp-cluster --region ${{ secrets.AWS_REGION }} --nodegroup-name giftapp-nodes --node-type t3.medium --nodes 2
+      - name: 🐳 登入 AWS ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
+      
+      - name: ⚙️ 檢查並建立 AWS EKS 叢集
+        run: |
+          eksctl get cluster --name giftapp-cluster || eksctl create cluster --name giftapp-cluster --region ${{ secrets.AWS_REGION }} --nodegroup-name giftapp-nodes --node-type t3.medium --nodes 2
 
-    - name: 🔧 設定 Kubeconfig
-      run: aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name giftapp-cluster
+      - name: 🔧 設定 Kubeconfig
+        run: aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name giftapp-cluster
 
-    - name: ⬆️ 部署 MongoDB 到 AWS EKS
-      run: |
-        kubectl apply -f ./kubernetes/deploymongo.yml
+      - name: ⬆️ 部署 MongoDB 到 AWS EKS
+        run: |
+          kubectl apply -f ./kubernetes/deploymongo.yml
 
-    - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
-      run: |
-        docker build ./giftlink-backend -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest
-        docker push ${{ secrets.ECR_REPO }}/giftapp-backend:latest
+      - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
+        run: |
+          docker build ./giftlink-backend -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest
+          docker push ${{ secrets.ECR_REPO }}/giftapp-backend:latest
 
-    - name: ⬆️ 部署 MongoDB 到 AWS EKS
-      run: |
-        kubectl apply -f ./kubernetes/deployment.yml
-    
-    - name: 📦 安裝 Express 和 CORS 在 giftwebsite
-      run: |
-        cd ./giftwebsite
-        npm install express cors
-        cd ..
+      - name: ⬆️ 部署 Backend 到 AWS EKS
+        run: |
+          kubectl apply -f ./kubernetes/deployment.yml
+      
+      - name: 📦 安裝 Express 和 CORS 在 giftwebsite
+        run: |
+          cd ./giftwebsite
+          npm install express cors
+          cd ..
 
-   - name: 🔍 取得 Backend 服務 URL
-      run: |
-        echo "等待 giftapp 部署啟動..."
-        kubectl rollout status deployment giftapp --timeout=60s  # 等待 Pod 啟動
+      - name: 🔍 取得 Backend 服務 URL
+        run: |
+          echo "等待 giftapp 部署啟動..."
+          kubectl rollout status deployment giftapp --timeout=60s  # 等待 Pod 啟動
 
-        echo "檢查 LoadBalancer..."
-        BACKEND_URL=$(kubectl get svc gift-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "檢查 LoadBalancer..."
+          BACKEND_URL=$(kubectl get svc gift-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 
-        if [ -z "$BACKEND_URL" ]; then
-          echo "未找到 LoadBalancer，使用 localhost:3060"
-          BACKEND_URL="http://localhost:3060"
-          
-          # 檢查 Pod 是否 Running
-          POD_STATUS=$(kubectl get pods -l app=giftapp -o jsonpath='{.items[0].status.phase}')
-          if [ "$POD_STATUS" != "Running" ]; then
-            echo "❌ `giftapp` 服務尚未運行，請檢查 Pod 狀態"
-            kubectl get pods -o wide
-            exit 1
+          if [ -z "$BACKEND_URL" ]; then
+            echo "未找到 LoadBalancer，使用 localhost:3060"
+            BACKEND_URL="http://localhost:3060"
+            
+            # 檢查 Pod 是否 Running
+            POD_STATUS=$(kubectl get pods -l app=giftapp -o jsonpath='{.items[0].status.phase}')
+            if [ "$POD_STATUS" != "Running" ]; then
+              echo "❌ `giftapp` 服務尚未運行，請檢查 Pod 狀態"
+              kubectl get pods -o wide
+              exit 1
+            fi
+
+            # 啟動 port-forward
+            kubectl port-forward deployment.apps/giftapp 3060:3060 &
+            sleep 10  # 等待 port-forward 生效
+          else
+            BACKEND_URL="http://$BACKEND_URL"
           fi
 
-          # 啟動 port-forward
-          kubectl port-forward deployment.apps/giftapp 3060:3060 &
-          sleep 10  # 等待 port-forward 生效
-        else
-          BACKEND_URL="http://$BACKEND_URL"
-        fi
+          echo "BACKEND_URL=$BACKEND_URL"
+          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
 
-        echo "BACKEND_URL=$BACKEND_URL"
-        echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+      - name: 📝 更新 giftlink-frontend env
+        run: |
+          echo "REACT_APP_BACKEND_URL=$BACKEND_URL" > ./giftlink-frontend/.env
+          cat giftlink-frontend/.env  # 確認內容是否更新成功
+      
+      - name: 📦 安裝 all the necessary packages in giftlink-frontend
+        run: |
+          cd ./giftlink-frontend
+          npm install
+          npm run build
+          cd ..
 
-    - name: 📝 更新 giftlink-frontend env
-      run: |
-        echo "REACT_APP_BACKEND_URL=$BACKEND_URL" > ./giftlink-frontend/.env
-        cat giftlink-frontend/.env  # 確認內容是否更新成功
-    
-    - name: 📦 安裝 all the necessary packages in giftlink-frontend
-      run: |
-        cd ./giftlink-frontend
-        npm run build
-        cd ..
+      - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR
+        run: |
+          docker build ./giftwebsite -t ${{ secrets.ECR_REPO }}/giftwebsite:latest
+          docker push ${{ secrets.ECR_REPO }}/giftwebsite:latest
 
-    - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR
-      run: |
-        docker build ./giftwebsite -t ${{ secrets.ECR_REPO }}/giftwebsite:latest
-        docker push ${{ secrets.ECR_REPO }}/giftwebsite:latest
-
-    - name: 🚀 啟動 GiftWebsite 並輸出網址
-      run: |
-        docker run -d -p 9000:9000 ${{ secrets.ECR_REPO }}/giftwebsite:latest
-        echo "🎉 你的網站已啟動！請在瀏覽器中開啟以下網址:"
-        echo "http://$(curl -s ifconfig.me):9000/home.html"
+      - name: 🚀 啟動 GiftWebsite 並輸出網址
+        run: |
+          docker run -d -p 9000:9000 ${{ secrets.ECR_REPO }}/giftwebsite:latest
+          echo "🎉 你的網站已啟動！請在瀏覽器中開啟以下網址:"
+          echo "http://$(curl -s ifconfig.me):9000/home.html"
