@@ -58,6 +58,7 @@ jobs:
 
     - name: 🔍 取得 Backend 服務 URL
       run: |
+      kubectl port-forward deployment.apps/giftapp 3060:3060
         BACKEND_URL=$(kubectl get svc gift-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
         if [ -z "$BACKEND_URL" ]; then
           echo "未找到 LoadBalancer，使用 localhost:3060"
@@ -85,7 +86,7 @@ jobs:
       run: |
         docker build ./giftwebsite -t ${{ secrets.ECR_REPO }}/giftwebsite:latest
         docker push ${{ secrets.ECR_REPO }}/giftwebsite:latest
-        
+
     - name: 🚀 啟動 GiftWebsite 並輸出網址
       run: |
         docker run -d -p 9000:9000 ${{ secrets.ECR_REPO }}/giftwebsite:latest
