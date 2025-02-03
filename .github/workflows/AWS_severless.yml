@@ -156,13 +156,13 @@ jobs:
               --service-name giftapp-backend \
               --source-configuration '{
                 "ImageRepository": {
-                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
+                  "ImageIdentifier": "253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
                     "Port": "3060",
                     "RuntimeEnvironmentVariables": {
-                      "DYNAMODB_TABLE": "GiftAppTable",
-                      "AWS_REGION": "${{ secrets.AWS_REGION }}",
+                      "DYNAMODB_TABLE": "giftapp-data",
+                      "AWS_REGION": "us-east-1",
                       "JWT_SECRET": "mysecret"
                     }
                   }
@@ -171,7 +171,11 @@ jobs:
                   "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
                 }
               }' \
-              --region ${{ secrets.AWS_REGION }}
+              --instance-configuration '{
+                "InstanceRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
+              }' \
+              --region us-east-1
+
           else
             echo "🔄 檢查 Backend App Runner 服務狀態..."
 
