@@ -88,7 +88,7 @@ jobs:
           app.use("*", cors());
           app.use(express.json());
 
-          const port = 3060;
+          const port = process.env.PORT || 3060;
 
           // 確保 API 正常運行
           app.get("/", (req, res) => {
