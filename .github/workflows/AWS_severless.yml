@@ -96,57 +96,24 @@ jobs:
         run: |
           ls -al giftlink-backend/util/import-mongo/
           cat giftlink-backend/util/import-mongo/gifts.json
-      - name: 🔧 確保 `db.js` 使用正確的 `gifts.json` 路徑
+      - name: 🔧 修正 `db.js`，避免 Shell 解析錯誤
         run: |
-          cat <<EOF > giftlink-backend/models/db.js
-          require("dotenv").config();
-          const fs = require("fs");
-          const path = require("path");
-          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-          const { DynamoDBDocumentClient, ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
+          echo 'require("dotenv").config();' > giftlink-backend/models/db.js
+          echo 'const fs = require("fs");' >> giftlink-backend/models/db.js
+          echo 'const path = require("path");' >> giftlink-backend/models/db.js
+          echo 'console.log("🔍 嘗試讀取 gifts.json");' >> giftlink-backend/models/db.js
+          echo 'const giftsFilePath = path.join(__dirname, "..", "util", "import-mongo", "gifts.json");' >> giftlink-backend/models/db.js
+          echo 'if (!fs.existsSync(giftsFilePath)) {' >> giftlink-backend/models/db.js
+          echo '  console.error("❌ 找不到 gifts.json: " + giftsFilePath);' >> giftlink-backend/models/db.js
+          echo '  process.exit(1);' >> giftlink-backend/models/db.js
+          echo '}' >> giftlink-backend/models/db.js
+      
+      - name: 🛠 確保 `db.js` 是 JS 而不是 Shell 腳本
+        run: file giftlink-backend/models/db.js
+      
+      - name: 🛠 確保 `db.js` 寫入正確
+        run: cat giftlink-backend/models/db.js
 
-          const client = new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" });
-          const dynamoDB = DynamoDBDocumentClient.from(client);
-          const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
-
-          // **修正 `gifts.json` 路徑**
-          const giftsFilePath = path.resolve(__dirname, "..", "util", "import-mongo", "gifts.json");
-
-          console.log(\`🔍 嘗試讀取 gifts.json: \${giftsFilePath}\`);
-
-          if (!fs.existsSync(giftsFilePath)) {
-            console.error(\`❌ 找不到 gifts.json: \${giftsFilePath}\`);
-            process.exit(1);
-          }
-
-          // **讀取 `gifts.json`**
-          const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
-
-          module.exports = {
-            getGifts: async () => {
-              const params = new ScanCommand({ TableName: TABLE_NAME });
-              const data = await dynamoDB.send(params);
-              return data.Items;
-            },
-            addGift: async (gift) => {
-              const params = new PutCommand({ TableName: TABLE_NAME, Item: gift });
-              await dynamoDB.send(params);
-              return gift;
-            },
-            initializeData: async () => {
-              const existingGifts = await db.getGifts();
-              if (existingGifts.length === 0) {
-                console.log("🔄 正在導入 `gifts.json` 到 DynamoDB...");
-                for (const gift of giftsData) {
-                  await db.addGift(gift);
-                }
-                console.log("✅ `gifts.json` 數據已成功導入！");
-              } else {
-                console.log("✅ `gifts.json` 已存在於 DynamoDB，跳過導入！");
-              }
-            }
-          };
-          EOF
 
 
 
