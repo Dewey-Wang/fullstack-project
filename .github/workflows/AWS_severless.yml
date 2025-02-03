@@ -63,11 +63,12 @@ jobs:
           JWT_SECRET=mysecret
           EOF
 
-      - name: 🔧 更新 `db.js` 來初始化 DynamoDB
+      - name: 🔧 修正 `db.js` 讀取 `gifts.json`
         run: |
           cat <<EOF > giftlink-backend/models/db.js
           require("dotenv").config();
           const fs = require("fs");
+          const { join } = require("path");
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const { DynamoDBDocumentClient, ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
 
@@ -75,8 +76,14 @@ jobs:
           const dynamoDB = DynamoDBDocumentClient.from(client);
           const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
 
-          // 讀取 gifts.json
-          const giftsData = JSON.parse(fs.readFileSync("../util/import-mongo/gifts.json", "utf8")).docs;
+          // **修正 `gifts.json` 路徑**
+          const giftsFilePath = join(__dirname, "../util/import-mongo/gifts.json");
+          if (!fs.existsSync(giftsFilePath)) {
+            console.error("❌ `gifts.json` 不存在，請檢查是否已包含在 Docker Image");
+            process.exit(1);
+          }
+
+          const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
 
           const db = {
             getGifts: async () => {
@@ -105,6 +112,7 @@ jobs:
 
           module.exports = db;
           EOF
+
 
      
       - name: 🔧 更新 `app.js` 來支援 DynamoDB
