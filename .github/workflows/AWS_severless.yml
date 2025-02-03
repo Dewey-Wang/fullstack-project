@@ -77,6 +77,7 @@ jobs:
           COPY . .
 
           # ✅ 確保 `gifts.json` 存在於 Docker Image
+          RUN mkdir -p /usr/src/app/util/import-mongo
           COPY util/import-mongo/gifts.json /usr/src/app/util/import-mongo/gifts.json
 
           EXPOSE 3060
@@ -102,7 +103,7 @@ jobs:
           const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
 
           // **修正 `gifts.json` 路徑**
-          const giftsFilePath = join(__dirname, "../util/import-mongo/gifts.json");
+          const giftsFilePath = "/usr/src/app/util/import-mongo/gifts.json";
           if (!fs.existsSync(giftsFilePath)) {
             console.error("❌ `gifts.json` 不存在，請檢查是否已包含在 Docker Image");
             process.exit(1);
