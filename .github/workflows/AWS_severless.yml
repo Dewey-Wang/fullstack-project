@@ -173,7 +173,7 @@ jobs:
                     "Port": "5000",
                     "RuntimeEnvironmentVariables": {
                       "DYNAMODB_TABLE": "giftapp-data",
-                      "AWS_REGION": "${{ secrets.AWS_REGION }}",
+                      "AWS_REGION": "${{ secrets.AWS_REGION }}"
                     }
                   }
                 },
