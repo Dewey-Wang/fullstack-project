@@ -186,9 +186,21 @@ jobs:
           kubectl apply -f ./kubernetes/giftwebsite-deployment.yml
           kubectl get pods -o wide
           kubectl get nodes -o wide
+          kubectl describe pod -l app=giftwebsite
+          kubectl get events --sort-by=.metadata.creationTimestamp
+
         
       - name: 📢 部署 giftwebsite 並確保 LoadBalancer 生效
         run: |
+          kubectl delete secret aws-ecr-secret --ignore-not-found
+          kubectl create secret docker-registry aws-ecr-secret \
+            --docker-server=${{ secrets.ECR_REPO }} \
+            --docker-username=AWS \
+            --docker-password=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }}) \
+            --namespace=default
+          
+          kubectl patch serviceaccount default -p '{"imagePullSecrets": [{"name": "aws-ecr-secret"}]}'
+
           # 確保 Deployment 部署成功
           kubectl rollout status deployment giftwebsite --timeout=120s || (echo "❌ giftwebsite 部署失敗" && exit 1)
 
