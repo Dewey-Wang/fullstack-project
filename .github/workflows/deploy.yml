@@ -103,6 +103,7 @@ jobs:
           kubectl delete deployment giftapp
           kubectl apply -f ./kubernetes/deployment.yml
           kubectl get pods -o wide
+          kubectl get nodes -o wide
 
       - name: 🏗️ 等待 giftapp 部署完成
         run: |
