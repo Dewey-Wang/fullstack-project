@@ -1,4 +1,4 @@
-name: Deploy to AWS Serverless
+name: Completely Deploy to AWS Serverless
 
 on:
   push:
@@ -122,7 +122,6 @@ jobs:
               --region ${{ secrets.AWS_REGION }}
           fi
 
-      - name: ⌛ 等待 App Runner 部署完成
 
       - name: 取得應用程式網址
         run: |
