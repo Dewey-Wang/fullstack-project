@@ -50,7 +50,53 @@ jobs:
           npm uninstall aws-sdk
           npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb dotenv
           cd ..
-     
+      - name: 🔧 更新 `util/import-mongo/.env`
+        run: |
+          cat <<EOF > giftlink-backend/util/import-mongo/.env
+          DYNAMODB_TABLE=giftapp-data
+          AWS_REGION=us-east-1
+          EOF
+      
+      - name: 🔧 更新 `util/import-mongo/index.js`
+        run: |
+          cat <<EOF > giftlink-backend/util/import-mongo/index.js
+          require("dotenv").config();
+          const fs = require("fs");
+          const { PutCommand } = require("@aws-sdk/lib-dynamodb");
+          const { connectToDatabase, TABLE_NAME } = require("../../models/db");
+          const giftsFilePath = "util/import-mongo/gifts.json";
+          const data = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
+          async function loadData() {
+              const db = await connectToDatabase();
+              
+              for (const gift of data) {
+                  await db.send(new PutCommand({ TableName: TABLE_NAME, Item: gift }));
+              }
+              console.log("✅ `gifts.json` 數據已成功導入 DynamoDB！");
+          }
+          loadData().catch(console.error);
+          module.exports = { loadData };
+          EOF
+      - name: 🔧 更新 `models/db.js`
+        run: |
+          cat <<EOF > giftlink-backend/models/db.js
+          require("dotenv").config();
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { DynamoDBDocumentClient } = require("@aws-sdk/lib-dynamodb");
+          
+          // AWS DynamoDB 連接設定
+          const client = new DynamoDBClient({ region: process.env.AWS_REGION });
+          const dbInstance = DynamoDBDocumentClient.from(client);
+          const TABLE_NAME = process.env.DYNAMODB_TABLE;
+          
+          async function connectToDatabase() {
+              return dbInstance;
+          }
+          
+          module.exports = { connectToDatabase, TABLE_NAME };
+          EOF
+
+
       - name: 🔧 更新 `.env`，移除 MongoDB 並添加 DynamoDB
         run: |
           cat <<EOF > giftlink-backend/.env
@@ -71,13 +117,6 @@ jobs:
           RUN npm install
           
           COPY . .
-          
-          # ✅ 確保 `gifts.json` 存在於 Docker Image
-          RUN mkdir -p /usr/src/app/util/import-mongo
-          COPY util/import-mongo/gifts.json /usr/src/app/util/import-mongo/gifts.json
-          
-          # ✅ 確保複製成功
-          RUN ls -al /usr/src/app/util/import-mongo/
           
           EXPOSE 3060
           
