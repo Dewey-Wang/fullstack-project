@@ -96,7 +96,7 @@ jobs:
         run: |
           ls -al giftlink-backend/util/import-mongo/
           cat giftlink-backend/util/import-mongo/gifts.json
-      - name: 🔧 修正 `db.js` 讀取 `gifts.json`
+      - name: 🔧 確保 `db.js` 使用正確的 `gifts.json` 路徑
         run: |
           cat <<EOF > giftlink-backend/models/db.js
           require("dotenv").config();
@@ -110,7 +110,7 @@ jobs:
           const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
 
           // **修正 `gifts.json` 路徑**
-          const giftsFilePath = path.join(process.cwd(), "giftlink-backend/util/import-mongo/gifts.json");
+          const giftsFilePath = path.resolve(__dirname, "..", "util", "import-mongo", "gifts.json");
 
           console.log(\`🔍 嘗試讀取 gifts.json: \${giftsFilePath}\`);
 
@@ -122,7 +122,7 @@ jobs:
           // **讀取 `gifts.json`**
           const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
 
-          const db = {
+          module.exports = {
             getGifts: async () => {
               const params = new ScanCommand({ TableName: TABLE_NAME });
               const data = await dynamoDB.send(params);
@@ -146,9 +146,8 @@ jobs:
               }
             }
           };
-
-          module.exports = db;
           EOF
+
 
 
 
