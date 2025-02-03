@@ -1,4 +1,4 @@
-name: Deploy to AWS
+name: Deploy to AWS severless
 
 on:
   push:
@@ -197,32 +197,43 @@ jobs:
 
       - name: 🚀 部署 giftwebsite 到 AWS App Runner
         run: |
-          # 嘗試建立 AWS App Runner 服務
-          aws apprunner create-service \
-            --service-name giftwebsite \
-            --source-configuration '{
-              "ImageRepository": {
-                "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftwebsite:latest",
-                "ImageRepositoryType": "ECR",
-                "ImageConfiguration": {
-                  "Port": "9000"
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+          
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "🔄 創建 App Runner 服務..."
+            aws apprunner create-service \
+              --service-name giftwebsite \
+              --source-configuration '{
+                "ImageRepository": {
+                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftwebsite:latest",
+                  "ImageRepositoryType": "ECR",
+                  "ImageConfiguration": {
+                    "Port": "9000"
+                  }
+                },
+                "AuthenticationConfiguration": {
+                  "AccessRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AppRunnerECRAccess"
                 }
-              }
-            }' \
-            --region ${{ secrets.AWS_REGION }} || \
-          # 如果服務已存在，則更新它
-          aws apprunner update-service \
-            --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }}) \
-            --source-configuration '{
-              "ImageRepository": {
-                "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftwebsite:latest",
-                "ImageRepositoryType": "ECR",
-                "ImageConfiguration": {
-                  "Port": "9000"
+              }' \
+              --region ${{ secrets.AWS_REGION }}
+          else
+            echo "🔄 更新 App Runner 服務..."
+            aws apprunner update-service \
+              --service-arn "$SERVICE_ARN" \
+              --source-configuration '{
+                "ImageRepository": {
+                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftwebsite:latest",
+                  "ImageRepositoryType": "ECR",
+                  "ImageConfiguration": {
+                    "Port": "9000"
+                  }
+                },
+                "AuthenticationConfiguration": {
+                  "AccessRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AppRunnerECRAccess"
                 }
-              }
-            }' \
-            --region ${{ secrets.AWS_REGION }}
+              }' \
+              --region ${{ secrets.AWS_REGION }}
+          fi
 
           echo "⌛ 等待 App Runner 部署完成..."
           sleep 30
@@ -237,6 +248,7 @@ jobs:
 
           echo "✅ GiftWebsite 可在這裡訪問: $GIFTWEBSITE_URL"
           echo "GIFTWEBSITE_URL=$GIFTWEBSITE_URL" >> $GITHUB_ENV
+
 
 
       - name: 📝 更新 README.md 顯示網站網址
