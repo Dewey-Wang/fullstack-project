@@ -125,13 +125,31 @@ jobs:
           else
             echo "✅ DynamoDB Table $TABLE_NAME 已存在，跳過創建"
           fi
+      - name: 🔐 登入 AWS ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
+
+      - name: 🏗️ 檢查並建立 AWS ECR 儲存庫（避免不存在）
+        run: |
+          REPO_NAME="giftapp-backend"
+          EXISTING_REPO=$(aws ecr describe-repositories --repository-names "$REPO_NAME" --region ${{ secrets.AWS_REGION }} 2>&1 || echo "MISSING")
+
+          if [[ "$EXISTING_REPO" == *"MISSING"* ]]; then
+            echo "🚀 AWS ECR 儲存庫 $REPO_NAME 不存在，創建中..."
+            aws ecr create-repository --repository-name "$REPO_NAME" --region ${{ secrets.AWS_REGION }}
+            echo "✅ AWS ECR 儲存庫 $REPO_NAME 已創建"
+          else
+            echo "✅ AWS ECR 儲存庫 $REPO_NAME 已存在"
+          fi
 
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
         run: |
           docker buildx create --use
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64 \
-            -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest --push ./giftlink-backend
+            -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest \
+            --push ./giftlink-backend
 
       - name: 🚀 部署 Backend 到 AWS App Runner
         run: |
