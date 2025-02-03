@@ -75,6 +75,16 @@ jobs:
           sed -i "s|<ECR_URL>|$ECR_URL|g" ./kubernetes/deployment.yml
           cat ./kubernetes/deployment.yml  # 確保內容已更新
       
+      - name: 🏗️ 創建 AWS ECR Secret，供 Kubernetes 拉取映像
+        run: |
+          kubectl create secret docker-registry aws-ecr-secret \
+            --docker-server=${{ secrets.ECR_REPO }} \
+            --docker-username=AWS \
+            --docker-password=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }}) \
+            --dry-run=client -o yaml | kubectl apply -f -
+          
+          echo "✅ AWS ECR Secret 已建立！"
+
       - name: ⬆️ 部署 Backend 到 AWS EKS
         run: |
           kubectl apply -f ./kubernetes/deployment.yml
