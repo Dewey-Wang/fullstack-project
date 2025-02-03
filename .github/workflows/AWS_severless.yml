@@ -230,9 +230,6 @@ jobs:
                   "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
                 }
               }' \
-              --instance-configuration '{
-                "InstanceRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
-              }' \
               --region ${{ secrets.AWS_REGION }}
           else
             echo "🔄 更新 App Runner 服務..."
@@ -243,17 +240,12 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "3060",
-                    "RuntimeEnvironmentVariables": {
-                      "DYNAMODB_TABLE": "giftapp-data",
-                      "AWS_REGION": "${{ secrets.AWS_REGION }}",
-                      "JWT_SECRET": "mysecret"
-                    }
+                    "Port": "3060"
                   }
                 }
               }' \
-              --instance-configuration '{
-                "InstanceRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
+              --AuthenticationConfiguration '{
+                "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
               }' \
               --region ${{ secrets.AWS_REGION }}
           fi
