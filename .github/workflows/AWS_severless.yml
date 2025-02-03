@@ -77,6 +77,50 @@ jobs:
 
           module.exports = db;
           EOF
+      - name: 🔧 更新 `app.js` 來支援 DynamoDB
+        run: |
+          cat <<EOF > giftlink-backend/app.js
+          const express = require("express");
+          const cors = require("cors");
+          const db = require("./models/db");
+
+          const app = express();
+          app.use("*", cors());
+          app.use(express.json());
+
+          const port = 3060;
+
+          // 確保 API 正常運行
+          app.get("/", (req, res) => {
+            res.send("Inside the server");
+          });
+
+          // 確保可以讀取與寫入 DynamoDB
+          app.get("/api/gifts", async (req, res) => {
+            try {
+              const gifts = await db.getGifts();
+              res.json(gifts);
+            } catch (error) {
+              res.status(500).json({ error: error.message });
+            }
+          });
+
+          app.post("/api/gifts", async (req, res) => {
+            try {
+              const newGift = req.body;
+              await db.addGift(newGift);
+              res.json({ message: "Gift added!", gift: newGift });
+            } catch (error) {
+              res.status(500).json({ error: error.message });
+            }
+          });
+
+          app.listen(port, "0.0.0.0", () => {
+            console.log(`Server running on port ${port}`);
+            console.log(`DynamoDB Table: ${TABLE_NAME}`);
+            console.log(`AWS Region: ${process.env.AWS_REGION}`);
+          });
+          EOF
 
       - name: ✅ 確保 AWS DynamoDB Table 存在
         run: |
