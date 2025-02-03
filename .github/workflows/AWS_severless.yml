@@ -56,8 +56,17 @@ jobs:
           DYNAMODB_TABLE=giftapp-data
           AWS_REGION=us-east-1
           EOF
-      
-      - name: 🔧 更新 `util/import-mongo/index.js`
+      - name: 🔧 確保 `.env` 設置 `DYNAMODB_TABLE`
+        run: |
+          cat <<EOF > giftlink-backend/.env
+          DYNAMODB_TABLE=giftapp-data
+          JWT_SECRET=mysecret
+          EOF
+          
+      - name: 🔄 輸出 `.env` 來確認設定
+        run: cat giftlink-backend/.env
+
+      - name: 🔧 修正 `index.js` 確保環境變數讀取正確
         run: |
           cat <<EOF > giftlink-backend/util/import-mongo/index.js
           require("dotenv").config();
@@ -65,9 +74,14 @@ jobs:
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
 
+          const TABLE_NAME = process.env.DYNAMODB_TABLE;
+          if (!TABLE_NAME) {
+              console.error("❌ DYNAMODB_TABLE 未設置，請確認 .env");
+              process.exit(1);
+          }
+
           const client = new DynamoDBClient({ region: process.env.AWS_REGION });
           const dynamoDB = DynamoDBDocumentClient.from(client);
-          const TABLE_NAME = process.env.DYNAMODB_TABLE;
 
           async function loadData() {
               console.log("📥 讀取 `gifts.json`...");
@@ -84,6 +98,7 @@ jobs:
 
           loadData().catch(console.error);
           EOF
+
 
       - name: 🔧 更新 `models/db.js`
         run: |
