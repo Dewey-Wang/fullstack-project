@@ -160,6 +160,12 @@ jobs:
           echo "REACT_APP_BACKEND_URL=$BACKEND_URL" > ./giftlink-frontend/.env
           cat giftlink-frontend/.env  # 確認內容是否更新成功
       
+      - name: 📦 安裝express and cors in giftwebsite
+        run: |
+          cd ./giftwebsite
+          npm install express cors
+          cd ..
+          
       - name: 📦 安裝所有必要的 packages in giftlink-frontend
         run: |
           cd ./giftlink-frontend
