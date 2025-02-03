@@ -34,7 +34,6 @@ jobs:
             if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
               echo "⚠️ `App Runner` 正在運行，等待完成..."
               while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
-                sleep 10
                 STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
               done
             fi
@@ -42,7 +41,6 @@ jobs:
             if [ "$STATUS" != "DELETED" ]; then
               echo "🛑 停止 App Runner 服務..."
               aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
-              sleep 20
             fi
           fi
 
