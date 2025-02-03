@@ -23,13 +23,35 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
+      # **🔴 确保 `App Runner` 不会卡住**
+      - name: ⏹️ 停止已有的 App Runner 服務 (避免 OPERATION_IN_PROGRESS)
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+          
+          if [ ! -z "$SERVICE_ARN" ]; then
+            STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+            
+            if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
+              echo "⚠️ `App Runner` 正在運行，等待完成..."
+              while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
+                sleep 10
+                STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+              done
+            fi
+            
+            if [ "$STATUS" != "DELETED" ]; then
+              echo "🛑 停止 App Runner 服務..."
+              aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
+              sleep 20
+            fi
+          fi
+
       - name: 📦 安裝 AWS SDK v3 & dotenv
         run: |
           cd giftlink-backend
           npm uninstall aws-sdk
           npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb dotenv
           cd ..
-
 
       - name: 🔧 更新 `db.js` 來使用 AWS SDK v3
         run: |
@@ -58,51 +80,7 @@ jobs:
           module.exports = db;
           EOF
 
-
-      - name: 🔧 更新 `app.js` 來支援 DynamoDB
-        run: |
-          cat <<EOF > giftlink-backend/app.js
-          const express = require("express");
-          const cors = require("cors");
-          const db = require("./models/db");
-
-          const app = express();
-          app.use("*", cors());
-          app.use(express.json());
-
-          const port = 3060;
-
-          // 確保 API 正常運行
-          app.get("/", (req, res) => {
-            res.send("Inside the server");
-          });
-
-          // 確保可以讀取與寫入 DynamoDB
-          app.get("/api/gifts", async (req, res) => {
-            try {
-              const gifts = await db.getGifts();
-              res.json(gifts);
-            } catch (error) {
-              res.status(500).json({ error: error.message });
-            }
-          });
-
-          app.post("/api/gifts", async (req, res) => {
-            try {
-              const newGift = req.body;
-              await db.addGift(newGift);
-              res.json({ message: "Gift added!", gift: newGift });
-            } catch (error) {
-              res.status(500).json({ error: error.message });
-            }
-          });
-
-          app.listen(port, "0.0.0.0", () => {
-            console.log(\`Server running on port \${port}\`);
-          });
-          EOF
-
-      - name: ✅ 檢查並建立 AWS DynamoDB Table
+      - name: ✅ 確保 AWS DynamoDB Table 存在
         run: |
           TABLE_NAME="giftapp-data"
           EXISTING_TABLE=$(aws dynamodb list-tables --query "TableNames" --output json | grep -w "$TABLE_NAME" || echo "")
@@ -117,25 +95,30 @@ jobs:
               --region ${{ secrets.AWS_REGION }}
             echo "✅ DynamoDB Table 創建成功！"
           else
-            echo "✅ DynamoDB Table $TABLE_NAME 已存在，跳過創建"
+            echo "✅ DynamoDB Table $TABLE_NAME 已存在"
           fi
-      - name: 🔐 登入 AWS ECR
-        run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
 
-      - name: 🏗️ 檢查並建立 AWS ECR 儲存庫（避免不存在）
+      - name: 🔐 確保 IAM Role 有權限
         run: |
-          REPO_NAME="giftapp-backend"
-          EXISTING_REPO=$(aws ecr describe-repositories --repository-names "$REPO_NAME" --region ${{ secrets.AWS_REGION }} 2>&1 || echo "MISSING")
-
-          if [[ "$EXISTING_REPO" == *"MISSING"* ]]; then
-            echo "🚀 AWS ECR 儲存庫 $REPO_NAME 不存在，創建中..."
-            aws ecr create-repository --repository-name "$REPO_NAME" --region ${{ secrets.AWS_REGION }}
-            echo "✅ AWS ECR 儲存庫 $REPO_NAME 已創建"
-          else
-            echo "✅ AWS ECR 儲存庫 $REPO_NAME 已存在"
-          fi
+          aws iam put-role-policy \
+            --role-name AppRunnerECRAccess \
+            --policy-name AppRunnerDynamoDBPolicy \
+            --policy-document '{
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "dynamodb:PutItem",
+                    "dynamodb:GetItem",
+                    "dynamodb:Scan",
+                    "dynamodb:DescribeTable",
+                    "dynamodb:UpdateItem"
+                  ],
+                  "Resource": "arn:aws:dynamodb:${{ secrets.AWS_REGION }}:253490795451:table/giftapp-data"
+                }
+              ]
+            }'
 
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
         run: |
@@ -145,12 +128,12 @@ jobs:
             -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest \
             --push ./giftlink-backend
 
-      - name: 🚀 部署 Backend 到 AWS App Runner
+      - name: 🚀 創建或更新 App Runner 服務
         run: |
-          BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
 
-          if [ -z "$BACKEND_ARN" ]; then
-            echo "🔄 創建 Backend App Runner 服務..."
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "🚀 創建新的 App Runner 服務..."
             aws apprunner create-service \
               --service-name giftapp-backend \
               --source-configuration '{
@@ -170,29 +153,14 @@ jobs:
                   "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
                 }
               }' \
+              --instance-configuration '{
+                "InstanceRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
+              }' \
               --region ${{ secrets.AWS_REGION }}
           else
-            echo "🔄 檢查 Backend App Runner 服務狀態..."
-
-            for i in {1..30}; do
-              STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-              if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
-                echo "⌛ 目前狀態: $STATUS，等待 10 秒..."
-                sleep 10
-              else
-                break
-              fi
-            done
-
-            STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-            if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
-              echo "❌ Backend 仍在 OPERATION_IN_PROGRESS，無法更新！請稍後重試。"
-              exit 1
-            fi
-
-            echo "🔄 更新 Backend App Runner 服務..."
+            echo "🔄 更新 App Runner 服務..."
             aws apprunner update-service \
-              --service-arn "$BACKEND_ARN" \
+              --service-arn "$SERVICE_ARN" \
               --source-configuration '{
                 "ImageRepository": {
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
@@ -205,14 +173,13 @@ jobs:
                       "JWT_SECRET": "mysecret"
                     }
                   }
-                },
-                "AuthenticationConfiguration": {
-                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
                 }
+              }' \
+              --instance-configuration '{
+                "InstanceRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
               }' \
               --region ${{ secrets.AWS_REGION }}
           fi
-
 
       - name: 🚀 部署 Frontend 到 AWS App Runner
         run: |
