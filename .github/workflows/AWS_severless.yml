@@ -50,11 +50,7 @@ jobs:
           npm uninstall aws-sdk
           npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb dotenv
           cd ..
-      - name: 🗑️ 移除 `util/import-mongo/.env`
-        run: rm -f giftlink-backend/util/import-mongo/.env
-      - name: 🗑️ 移除 `util/import-mongo/index.js`
-        run: rm -f giftlink-backend/util/import-mongo/index.js
-
+     
       - name: 🔧 更新 `.env`，移除 MongoDB 並添加 DynamoDB
         run: |
           cat <<EOF > giftlink-backend/.env
@@ -105,24 +101,16 @@ jobs:
           cat <<EOF > giftlink-backend/models/db.js
           require("dotenv").config();
           const fs = require("fs");
-          const { join } = require("path");
+          const path = require("path");
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const { DynamoDBDocumentClient, ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
-
+          
           const client = new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" });
           const dynamoDB = DynamoDBDocumentClient.from(client);
           const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
-
-          const fs = require("fs");
-          const path = require("path");
           
-          // **判斷是否在 Docker 內**
-          const isDocker = fs.existsSync("/.dockerenv");
-          
-          // **動態取得 `gifts.json` 的正確路徑**
-          const giftsFilePath = isDocker
-            ? "/usr/src/app/util/import-mongo/gifts.json"  // Docker 內
-            : path.join(__dirname, "../../util/import-mongo/gifts.json");  // GitHub Actions 或本地
+          // **修正 `gifts.json` 路徑**
+          const giftsFilePath = path.join(__dirname, "../util/import-mongo/gifts.json");
           
           console.log(`🔍 嘗試讀取 gifts.json: ${giftsFilePath}`);
           
@@ -133,7 +121,7 @@ jobs:
           
           // **讀取 `gifts.json`**
           const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
-
+          
           const db = {
             getGifts: async () => {
               const params = new ScanCommand({ TableName: TABLE_NAME });
@@ -158,7 +146,6 @@ jobs:
               }
             }
           };
-
           module.exports = db;
           EOF
 
