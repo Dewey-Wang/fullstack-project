@@ -171,7 +171,10 @@ jobs:
         run: |
           aws iam list-attached-role-policies --role-name AppRunnerECRAccess
       - name: 🔍 检查 GitHub Actions 运行的 IAM 账号
-        run: aws sts get-caller-identity
+        run: |
+          aws sts get-caller-identity
+          aws ecr get-repository-policy --repository-name giftapp-backend --region us-east-1
+
 
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
         run: |
