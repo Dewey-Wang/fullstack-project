@@ -104,24 +104,24 @@ jobs:
           const path = require("path");
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const { DynamoDBDocumentClient, ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
-          
+
           const client = new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" });
           const dynamoDB = DynamoDBDocumentClient.from(client);
           const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
-          
+
           // **修正 `gifts.json` 路徑**
-          const giftsFilePath = path.join(__dirname, "../util/import-mongo/gifts.json");
-          
-          console.log(`🔍 嘗試讀取 gifts.json: ${giftsFilePath}`);
-          
+          const giftsFilePath = path.join(process.cwd(), "giftlink-backend/util/import-mongo/gifts.json");
+
+          console.log(\`🔍 嘗試讀取 gifts.json: \${giftsFilePath}\`);
+
           if (!fs.existsSync(giftsFilePath)) {
-            console.error(`❌ 找不到 gifts.json: ${giftsFilePath}`);
+            console.error(\`❌ 找不到 gifts.json: \${giftsFilePath}\`);
             process.exit(1);
           }
-          
+
           // **讀取 `gifts.json`**
           const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
-          
+
           const db = {
             getGifts: async () => {
               const params = new ScanCommand({ TableName: TABLE_NAME });
@@ -146,8 +146,10 @@ jobs:
               }
             }
           };
+
           module.exports = db;
           EOF
+
 
 
      
