@@ -62,21 +62,29 @@ jobs:
           cat <<EOF > giftlink-backend/util/import-mongo/index.js
           require("dotenv").config();
           const fs = require("fs");
-          const { PutCommand } = require("@aws-sdk/lib-dynamodb");
-          const { connectToDatabase, TABLE_NAME } = require("../../models/db");
-          const giftsFilePath = "util/import-mongo/gifts.json";
-          const data = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
+
+          const client = new DynamoDBClient({ region: process.env.AWS_REGION });
+          const dynamoDB = DynamoDBDocumentClient.from(client);
+          const TABLE_NAME = process.env.DYNAMODB_TABLE;
+
           async function loadData() {
-              const db = await connectToDatabase();
-              
-              for (const gift of data) {
-                  await db.send(new PutCommand({ TableName: TABLE_NAME, Item: gift }));
+              console.log("📥 讀取 `gifts.json`...");
+              const giftsFilePath = "giftlink-backend/util/import-mongo/gifts.json";
+              const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
+
+              console.log("🚀 開始寫入 DynamoDB...");
+              for (const gift of giftsData) {
+                  await dynamoDB.send(new PutCommand({ TableName: TABLE_NAME, Item: gift }));
+                  console.log(\`✅ 已寫入: \${gift.name}\`);
               }
               console.log("✅ `gifts.json` 數據已成功導入 DynamoDB！");
           }
+
           loadData().catch(console.error);
-          module.exports = { loadData };
           EOF
+
       - name: 🔧 更新 `models/db.js`
         run: |
           cat <<EOF > giftlink-backend/models/db.js
