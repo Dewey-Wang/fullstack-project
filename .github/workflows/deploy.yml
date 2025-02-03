@@ -54,7 +54,6 @@ jobs:
           kubectl apply -f ./kubernetes/deploymongo.yml
           
           echo "⌛ 等待 MongoDB 部署完成..."
-          sleep 10  # 等待 Kubernetes 部署
 
           echo "🔍 檢查 MongoDB Pods 狀態..."
           kubectl get pods
@@ -101,12 +100,13 @@ jobs:
 
       - name: ⬆️ 部署 Backend 到 AWS EKS
         run: |
+          kubectl delete deployment giftapp
           kubectl apply -f ./kubernetes/deployment.yml
       
       - name: 🏗️ 等待 giftapp 部署完成
         run: |
           echo "⌛ 等待 giftapp 部署完成..."
-          kubectl rollout status deployment giftapp --timeout=180s || (echo "❌ giftapp 部署失敗，顯示 Pod 狀態：" && kubectl get pods && kubectl describe pod -l app=giftapp && exit 1)
+          kubectl rollout status deployment giftapp --timeout=120s || (echo "❌ giftapp 部署失敗，顯示 Pod 狀態：" && kubectl get pods && kubectl describe pod -l app=giftapp && exit 1)
 
           echo "🔍 檢查 LoadBalancer..."
           BACKEND_URL=$(kubectl get svc gift-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
