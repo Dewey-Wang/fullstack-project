@@ -164,24 +164,38 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "3060"
+                    "Port": "3060",
+                    "RuntimeEnvironmentVariables": {
+                      "DYNAMODB_TABLE": "GiftAppTable",
+                      "AWS_REGION": "${{ secrets.AWS_REGION }}",
+                      "JWT_SECRET": "mysecret"
+                    }
                   }
                 },
                 "AuthenticationConfiguration": {
                   "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
                 }
               }' \
-              --region ${{ secrets.AWS_REGION }} \
-              --instance-configuration '{
-                "Cpu": "1 vCPU",
-                "Memory": "2 GB",
-                "EnvironmentVariables": [
-                  {"Name": "DATABASE_TYPE", "Value": "DYNAMODB"},
-                  {"Name": "DYNAMODB_TABLE", "Value": "giftapp-data"},
-                  {"Name": "JWT_SECRET", "Value": "mysecret"}
-                ]
-              }'
+              --region ${{ secrets.AWS_REGION }}
           else
+            echo "🔄 檢查 Backend App Runner 服務狀態..."
+
+            for i in {1..30}; do
+              STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+              if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
+                echo "⌛ 目前狀態: $STATUS，等待 10 秒..."
+                sleep 10
+              else
+                break
+              fi
+            done
+
+            STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+            if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
+              echo "❌ Backend 仍在 OPERATION_IN_PROGRESS，無法更新！請稍後重試。"
+              exit 1
+            fi
+
             echo "🔄 更新 Backend App Runner 服務..."
             aws apprunner update-service \
               --service-arn "$BACKEND_ARN" \
@@ -190,23 +204,21 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "3060"
+                    "Port": "3060",
+                    "RuntimeEnvironmentVariables": {
+                      "DYNAMODB_TABLE": "GiftAppTable",
+                      "AWS_REGION": "${{ secrets.AWS_REGION }}",
+                      "JWT_SECRET": "mysecret"
+                    }
                   }
                 },
                 "AuthenticationConfiguration": {
                   "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
                 }
               }' \
-              --region ${{ secrets.AWS_REGION }} \
-              --instance-configuration '{
-                "EnvironmentVariables": [
-                  {"Name": "DATABASE_TYPE", "Value": "DYNAMODB"},
-                  {"Name": "DYNAMODB_TABLE", "Value": "giftapp-data"},
-                  {"Name": "JWT_SECRET", "Value": "mysecret"}
-                ]
-              }'
+              --region ${{ secrets.AWS_REGION }}
           fi
-
+          
       - name: 🚀 部署 Frontend 到 AWS App Runner
         run: |
           FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
