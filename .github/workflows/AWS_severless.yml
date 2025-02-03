@@ -28,15 +28,23 @@ jobs:
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
 
-      # ✅ 檢查 App Runner 是否有正確的 IAM 權限
-      - name: 🔍 檢查 App Runner IAM 角色
+      # ✅ 2️⃣ 確保 AWS DynamoDB Table 存在
+      - name: 🔍 檢查或建立 DynamoDB Table
         run: |
-          ROLE_EXISTS=$(aws iam get-role --role-name AppRunnerECRAccess --query "Role.RoleName" --output text || echo "MISSING")
-          if [ "$ROLE_EXISTS" == "MISSING" ]; then
-            echo "❌ IAM 角色 AppRunnerECRAccess 不存在，請手動建立！"
-            exit 1
+          TABLE_NAME="giftapp-data"
+          TABLE_EXISTS=$(aws dynamodb list-tables --query "TableNames" --output json | jq -r --arg TABLE_NAME "$TABLE_NAME" 'contains([$TABLE_NAME])')
+
+          if [ "$TABLE_EXISTS" != "true" ]; then
+            echo "🚀 創建 DynamoDB Table: $TABLE_NAME..."
+            aws dynamodb create-table \
+              --table-name $TABLE_NAME \
+              --attribute-definitions AttributeName=id,AttributeType=S \
+              --key-schema AttributeName=id,KeyType=HASH \
+              --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5 \
+              --region ${{ secrets.AWS_REGION }}
+            echo "✅ DynamoDB Table 創建成功！"
           else
-            echo "✅ IAM 角色 AppRunnerECRAccess 存在"
+            echo "✅ DynamoDB Table 已存在，跳過創建"
           fi
 
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
@@ -75,13 +83,11 @@ jobs:
               }' \
               --region ${{ secrets.AWS_REGION }} \
               --instance-configuration '{
-                "Cpu": "1 vCPU",
-                "Memory": "2 GB",
-                "EnvironmentVariables": {
-                  "DATABASE_TYPE": "DYNAMODB",
-                  "DYNAMODB_TABLE": "giftapp-data",
-                  "JWT_SECRET": "mysecret"
-                }
+                "EnvironmentVariables": [
+                  {"Name": "DATABASE_TYPE", "Value": "DYNAMODB"},
+                  {"Name": "DYNAMODB_TABLE", "Value": "giftapp-data"},
+                  {"Name": "JWT_SECRET", "Value": "mysecret"}
+                ]
               }'
           else
             echo "🔄 更新 Backend App Runner 服務..."
@@ -101,22 +107,14 @@ jobs:
               }' \
               --region ${{ secrets.AWS_REGION }} \
               --instance-configuration '{
-                "EnvironmentVariables": {
-                  "DATABASE_TYPE": "DYNAMODB",
-                  "DYNAMODB_TABLE": "giftapp-data",
-                  "JWT_SECRET": "mysecret"
-                }
+                "EnvironmentVariables": [
+                  {"Name": "DATABASE_TYPE", "Value": "DYNAMODB"},
+                  {"Name": "DYNAMODB_TABLE", "Value": "giftapp-data"},
+                  {"Name": "JWT_SECRET", "Value": "mysecret"}
+                ]
               }'
           fi
 
-
-      - name: 🚀 檢查 backend 到 AWS App Runner
-        run: |
-          aws apprunner describe-service --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }}) --region ${{ secrets.AWS_REGION }} --query "Service.Status"
-          docker run -p 3060:3060 ${{ secrets.ECR_REPO }}/giftapp-backend:latest
-
-
-        
       - name: 🚀 部署 Frontend 到 AWS App Runner
         run: |
           FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
@@ -176,7 +174,7 @@ jobs:
           echo '🔗 <a href="https://'$FRONTEND_URL'" target="_blank">**訪問 GiftWebsite**</a>' >> README.md
           echo "" >> README.md
           echo "🚀 每次 Push 到 main 都會自動部署到 AWS App Runner！" >> README.md
-
+          
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
           git add README.md
