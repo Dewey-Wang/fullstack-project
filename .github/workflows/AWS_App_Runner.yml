@@ -265,5 +265,7 @@ jobs:
           git config --global user.email 'github-actions@github.com'
           git add README.md
           git commit -m "更新 README.md，顯示最新的部署網址"
-          git push
 
+          # **使用 GitHub Token 授權**
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          git push
