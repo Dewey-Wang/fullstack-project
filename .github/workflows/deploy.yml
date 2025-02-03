@@ -178,12 +178,17 @@ jobs:
           docker buildx create --use
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64 -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
-
+     
+      - name: ⬆️ 部署 giftwebsite 到 AWS EKS
+        run: |
+         # 確保 giftwebsite Deployment 存在
+          kubectl delete deployment giftwebsite
+          kubectl apply -f ./kubernetes/giftwebsite-deployment.yml
+          kubectl get pods -o wide
+          kubectl get nodes -o wide
+        
       - name: 📢 部署 giftwebsite 並確保 LoadBalancer 生效
         run: |
-          # 確保 giftwebsite Deployment 存在
-          kubectl apply -f ./kubernetes/giftwebsite-deployment.yml
-          
           # 確保 Deployment 部署成功
           kubectl rollout status deployment giftwebsite --timeout=120s || (echo "❌ giftwebsite 部署失敗" && exit 1)
 
