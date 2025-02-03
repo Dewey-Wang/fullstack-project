@@ -170,6 +170,27 @@ jobs:
       - name: 🔍 确保 AppRunnerECRAccess 绑定了 ECR 访问权限
         run: |
           aws iam list-attached-role-policies --role-name AppRunnerECRAccess
+          aws ecr set-repository-policy \
+            --repository-name giftapp-backend \
+            --policy-text '{
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": "apprunner.amazonaws.com"
+                  },
+                  "Action": [
+                    "ecr:BatchGetImage",
+                    "ecr:GetDownloadUrlForLayer",
+                    "ecr:GetAuthorizationToken"
+                  ]
+                }
+              ]
+            }' \
+            --region us-east-1
+          
+
       - name: 🔍 检查 GitHub Actions 运行的 IAM 账号
         run: |
           aws sts get-caller-identity
