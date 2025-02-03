@@ -63,51 +63,27 @@ jobs:
         run: |
           cat <<EOF > giftlink-backend/Dockerfile
           FROM node:18.12.1-bullseye-slim
-
-          WORKDIR /usr/src/app
-
-          COPY package*.json ./
-
-          RUN npm install
-
-          COPY . .
-
-          # 確保目錄存在
-          RUN mkdir -p /usr/src/app/util/import-mongo
           
-          # **COPY gifts.json**
+          WORKDIR /usr/src/app
+          
+          COPY package*.json ./
+          
+          RUN npm install
+          
+          COPY . .
+          
+          # ✅ 確保 `gifts.json` 存在於 Docker Image
+          RUN mkdir -p /usr/src/app/util/import-mongo
           COPY util/import-mongo/gifts.json /usr/src/app/util/import-mongo/gifts.json
           
-          # 確保複製成功
+          # ✅ 確保複製成功
           RUN ls -al /usr/src/app/util/import-mongo/
-
+          
           EXPOSE 3060
-
+          
           CMD ["node", "app.js"]
           EOF
       
-
-      - name: 🔧 修正 `db.js` 讀取 `gifts.json`
-        run: |
-          ls -al giftlink-backend/util/import-mongo/
-          cat giftlink-backend/util/import-mongo/gifts.json
-      - name: 🔧 修正 `db.js`，避免 Shell 解析錯誤
-        run: |
-          echo 'require("dotenv").config();' > giftlink-backend/models/db.js
-          echo 'const fs = require("fs");' >> giftlink-backend/models/db.js
-          echo 'const path = require("path");' >> giftlink-backend/models/db.js
-          echo 'console.log("🔍 嘗試讀取 gifts.json");' >> giftlink-backend/models/db.js
-          echo 'const giftsFilePath = path.join(__dirname, "..", "util", "import-mongo", "gifts.json");' >> giftlink-backend/models/db.js
-          echo 'if (!fs.existsSync(giftsFilePath)) {' >> giftlink-backend/models/db.js
-          echo '  console.error("❌ 找不到 gifts.json: " + giftsFilePath);' >> giftlink-backend/models/db.js
-          echo '  process.exit(1);' >> giftlink-backend/models/db.js
-          echo '}' >> giftlink-backend/models/db.js
-      
-      - name: 🛠 確保 `db.js` 是 JS 而不是 Shell 腳本
-        run: file giftlink-backend/models/db.js
-      
-      - name: 🛠 確保 `db.js` 寫入正確
-        run: cat giftlink-backend/models/db.js
 
      
       - name: 🔧 更新 `app.js` 來支援 DynamoDB
