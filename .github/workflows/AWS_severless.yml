@@ -64,10 +64,10 @@ jobs:
           docker buildx build --platform linux/amd64 \
             -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
 
-      - name: 🚀 部署 Backend 到 AWS App Runner
+     - name: 🚀 部署 Backend 到 AWS App Runner
         run: |
           BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
-
+      
           if [ -z "$BACKEND_ARN" ]; then
             echo "🔄 創建 Backend App Runner 服務..."
             aws apprunner create-service \
@@ -86,6 +86,27 @@ jobs:
               }' \
               --region ${{ secrets.AWS_REGION }}
           else
+            echo "🔄 檢查 Backend App Runner 服務狀態..."
+            
+            # 🔄 等待 App Runner 完成現有操作，最多等 5 分鐘
+            for i in {1..30}; do
+              STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+              
+              if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
+                echo "⌛ 目前狀態: $STATUS，等待 10 秒..."
+                sleep 10
+              else
+                break
+              fi
+            done
+      
+            # 確保狀態不是 OPERATION_IN_PROGRESS
+            STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+            if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
+              echo "❌ Backend 仍在 OPERATION_IN_PROGRESS，無法更新！請稍後重試。"
+              exit 1
+            fi
+      
             echo "🔄 更新 Backend App Runner 服務..."
             aws apprunner update-service \
               --service-arn "$BACKEND_ARN" \
