@@ -232,9 +232,8 @@ jobs:
           docker buildx create --use
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64 \
-            -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest \
-            ./giftlink-backend
-          docker push 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest
+            -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/giftapp-backend:latest \
+            --push ./giftlink-backend
 
       - name: 🚀 創建或更新 App Runner 服務
         run: |
