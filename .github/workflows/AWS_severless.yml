@@ -29,13 +29,11 @@ jobs:
           npm install aws-sdk dotenv
           cd ..
 
-      - name: 🔧 自動修改 `db.js` 來支援 DynamoDB
+      - name: 🔧 更新 `db.js` 來支援 DynamoDB
         run: |
           cat <<EOF > giftlink-backend/models/db.js
+          require("dotenv").config();
           const AWS = require("aws-sdk");
-          const dotenv = require("dotenv");
-
-          dotenv.config();
 
           const databaseType = process.env.DATABASE_TYPE || "DYNAMODB";
 
@@ -66,15 +64,26 @@ jobs:
           }
           EOF
 
-      - name: 🔧 自動修改 `app.js` 來適配 DynamoDB
+
+      - name: 🔧 更新 `app.js` 來支援 DynamoDB
         run: |
           cat <<EOF > giftlink-backend/app.js
           const express = require("express");
+          const cors = require("cors");
           const db = require("./models/db");
 
           const app = express();
+          app.use("*", cors());
           app.use(express.json());
 
+          const port = 3060;
+
+          // 確保 API 正常運行
+          app.get("/", (req, res) => {
+            res.send("Inside the server");
+          });
+
+          // 確保可以讀取與寫入 DynamoDB
           app.get("/api/gifts", async (req, res) => {
             try {
               const gifts = await db.getGifts();
@@ -94,9 +103,8 @@ jobs:
             }
           });
 
-          const PORT = process.env.PORT || 3060;
-          app.listen(PORT, "0.0.0.0", () => {
-            console.log(\`Server running on port \${PORT}\`);
+          app.listen(port, "0.0.0.0", () => {
+            console.log(\`Server running on port \${port}\`);
           });
           EOF
 
