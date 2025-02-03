@@ -26,23 +26,31 @@ jobs:
       # **🔴 确保 `App Runner` 不会卡住**
       - name: ⏹️ 停止已有的 App Runner 服務 (避免 OPERATION_IN_PROGRESS)
         run: |
-          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ***)
+          echo "🔍 取得 Service ARN: $SERVICE_ARN"
           
-          if [ ! -z "$SERVICE_ARN" ]; then
-            STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-            
-            if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
-              echo "⚠️ `App Runner` 正在運行，等待完成..."
-              while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
-                STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-              done
-            fi
-            
-            if [ "$STATUS" != "DELETED" ]; then
-              echo "🛑 停止 App Runner 服務..."
-              aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
-            fi
+          if [ -n "$SERVICE_ARN" ] && [ "$SERVICE_ARN" != "None" ]; then
+              STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ***)
+              echo "🔍 取得 App Runner 狀態: $STATUS"
+          
+              if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
+                echo "⚠️ `App Runner` 正在運行，等待完成..."
+                while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
+                  sleep 10  # ✅ 避免無窮迴圈
+                  STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ***)
+                  echo "🔄 當前狀態: $STATUS"
+                done
+              fi
+          
+              if [ "$STATUS" != "DELETED" ]; then
+                echo "🛑 停止 App Runner 服務..."
+                aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ***
+                echo "✅ 已刪除 `App Runner` 服務"
+              fi
+          else
+              echo "✅ `giftapp-backend` 服務不存在，無需刪除"
           fi
+
 
       - name: 📦 安裝 AWS SDK v3 & dotenv
         run: |
@@ -77,7 +85,7 @@ jobs:
           const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
 
           // **修正 `gifts.json` 路徑**
-          const giftsFilePath = join(__dirname, "../util/import-mongo/gifts.json");
+          const giftsFilePath = join(__dirname, "./giftlink-backend/util/import-mongo/gifts.json");
           if (!fs.existsSync(giftsFilePath)) {
             console.error("❌ `gifts.json` 不存在，請檢查是否已包含在 Docker Image");
             process.exit(1);
