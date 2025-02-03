@@ -23,45 +23,39 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 📦 安裝 AWS SDK & dotenv（確保 Backend 依賴）
+      - name: 📦 安裝 AWS SDK v3 & dotenv
         run: |
           cd giftlink-backend
-          npm install aws-sdk dotenv
+          npm uninstall aws-sdk
+          npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb dotenv
           cd ..
 
-      - name: 🔧 更新 `db.js` 來支援 DynamoDB
+
+      - name: 🔧 更新 `db.js` 來使用 AWS SDK v3
         run: |
           cat <<EOF > giftlink-backend/models/db.js
           require("dotenv").config();
-          const AWS = require("aws-sdk");
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { DynamoDBDocumentClient, ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
 
-          const databaseType = process.env.DATABASE_TYPE || "DYNAMODB";
+          const client = new DynamoDBClient({ region: process.env.AWS_REGION || "us-east-1" });
+          const dynamoDB = DynamoDBDocumentClient.from(client);
+          const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
 
-          if (databaseType === "DYNAMODB") {
-            console.log("✅ 使用 AWS DynamoDB...");
-            AWS.config.update({ region: process.env.AWS_REGION || "us-east-1" });
+          const db = {
+            getGifts: async () => {
+              const params = new ScanCommand({ TableName: TABLE_NAME });
+              const data = await dynamoDB.send(params);
+              return data.Items;
+            },
+            addGift: async (gift) => {
+              const params = new PutCommand({ TableName: TABLE_NAME, Item: gift });
+              await dynamoDB.send(params);
+              return gift;
+            }
+          };
 
-            const dynamoDB = new AWS.DynamoDB.DocumentClient();
-            const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
-
-            const db = {
-              getGifts: async () => {
-                const params = { TableName: TABLE_NAME };
-                const data = await dynamoDB.scan(params).promise();
-                return data.Items;
-              },
-              addGift: async (gift) => {
-                const params = { TableName: TABLE_NAME, Item: gift };
-                await dynamoDB.put(params).promise();
-                return gift;
-              }
-            };
-
-            module.exports = db;
-          } else {
-            console.error("❌ 錯誤: DATABASE_TYPE 設定錯誤，請確認環境變數！");
-            process.exit(1);
-          }
+          module.exports = db;
           EOF
 
 
