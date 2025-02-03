@@ -120,7 +120,13 @@ jobs:
               }' \
               --region ${{ secrets.AWS_REGION }}
           fi
+      - name: 🚀 檢查 backend 到 AWS App Runner
+        run: |
+          aws apprunner describe-service --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }}) --region ${{ secrets.AWS_REGION }} --query "Service.Status"
+          docker run -p 3060:3060 ${{ secrets.ECR_REPO }}/giftapp-backend:latest
 
+
+        
       - name: 🚀 部署 Frontend 到 AWS App Runner
         run: |
           FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
