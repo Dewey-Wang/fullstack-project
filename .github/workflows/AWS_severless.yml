@@ -76,7 +76,7 @@ jobs:
           const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
 
           // 讀取 gifts.json
-          const giftsData = JSON.parse(fs.readFileSync("util/import-mongo/gifts.json", "utf8")).docs;
+          const giftsData = JSON.parse(fs.readFileSync("../util/import-mongo/gifts.json", "utf8")).docs;
 
           const db = {
             getGifts: async () => {
