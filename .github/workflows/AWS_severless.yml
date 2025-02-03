@@ -28,17 +28,6 @@ jobs:
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
 
-      # ✅ 檢查 Backend Docker Image 是否存在
-      - name: 🔍 檢查 Backend Image 是否存在於 AWS ECR
-        run: |
-          IMAGE_COUNT=$(aws ecr list-images --repository-name giftapp-backend --region ${{ secrets.AWS_REGION }} --query 'imageIds' | jq length)
-          if [ "$IMAGE_COUNT" -eq "0" ]; then
-            echo "❌ Backend Image 不存在，請先 Build 並 Push！"
-            exit 1
-          else
-            echo "✅ Backend Image 存在，繼續部署..."
-          fi
-
       # ✅ 檢查 App Runner 是否有正確的 IAM 權限
       - name: 🔍 檢查 App Runner IAM 角色
         run: |
@@ -67,7 +56,7 @@ jobs:
       - name: 🚀 部署 Backend 到 AWS App Runner
         run: |
           BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
-      
+
           if [ -z "$BACKEND_ARN" ]; then
             echo "🔄 創建 Backend App Runner 服務..."
             aws apprunner create-service \
@@ -77,7 +66,12 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "3060"
+                    "Port": "3060",
+                    "RuntimeEnvironmentVariables": {
+                      "DYNAMODB_TABLE": "GiftAppTable",
+                      "AWS_REGION": "${{ secrets.AWS_REGION }}",
+                      "JWT_SECRET": "mysecret"
+                    }
                   }
                 },
                 "AuthenticationConfiguration": {
@@ -87,11 +81,9 @@ jobs:
               --region ${{ secrets.AWS_REGION }}
           else
             echo "🔄 檢查 Backend App Runner 服務狀態..."
-            
-            # 🔄 等待 App Runner 完成現有操作，最多等 5 分鐘
+
             for i in {1..30}; do
               STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-              
               if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
                 echo "⌛ 目前狀態: $STATUS，等待 10 秒..."
                 sleep 10
@@ -99,14 +91,13 @@ jobs:
                 break
               fi
             done
-      
-            # 確保狀態不是 OPERATION_IN_PROGRESS
+
             STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
             if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
               echo "❌ Backend 仍在 OPERATION_IN_PROGRESS，無法更新！請稍後重試。"
               exit 1
             fi
-      
+
             echo "🔄 更新 Backend App Runner 服務..."
             aws apprunner update-service \
               --service-arn "$BACKEND_ARN" \
@@ -115,7 +106,12 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "3060"
+                    "Port": "3060",
+                    "RuntimeEnvironmentVariables": {
+                      "DYNAMODB_TABLE": "GiftAppTable",
+                      "AWS_REGION": "${{ secrets.AWS_REGION }}",
+                      "JWT_SECRET": "mysecret"
+                    }
                   }
                 },
                 "AuthenticationConfiguration": {
@@ -165,17 +161,6 @@ jobs:
               --region ${{ secrets.AWS_REGION }}
           fi
 
-      # ✅ 檢查 Backend 是否成功啟動
-      - name: 🔍 確保 Backend 服務正常運行
-        run: |
-          BACKEND_STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-          if [ "$BACKEND_STATUS" != "RUNNING" ]; then
-            echo "❌ Backend App Runner 部署失敗，狀態: $BACKEND_STATUS"
-            exit 1
-          else
-            echo "✅ Backend 服務正在運行"
-          fi
-
       - name: 取得應用程式網址
         run: |
           BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
@@ -195,7 +180,7 @@ jobs:
           echo '🔗 <a href="https://'$FRONTEND_URL'" target="_blank">**訪問 GiftWebsite**</a>' >> README.md
           echo "" >> README.md
           echo "🚀 每次 Push 到 main 都會自動部署到 AWS App Runner！" >> README.md
-          
+
           git config --global user.name 'github-actions'
           git config --global user.email 'github-actions@github.com'
           git add README.md
