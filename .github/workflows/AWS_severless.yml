@@ -65,14 +65,11 @@ jobs:
           
       - name: 🔄 輸出 `.env` 來確認設定
         run: cat giftlink-backend/.env
-      - name: 🛠 測試 `DYNAMODB_TABLE` 是否正確讀取
-        run: |
-          echo "DYNAMODB_TABLE=$DYNAMODB_TABLE"
 
-      - name: 🔧 修正 `index.js` 確保環境變數讀取正確
+      - name: 🔧 修正 `index.js` 確保 `.env` 正確載入
         run: |
           cat <<EOF > giftlink-backend/util/import-mongo/index.js
-          require("dotenv").config();
+          require("dotenv").config({ path: "giftlink-backend/util/import-mongo/.env" });
           const fs = require("fs");
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
@@ -101,6 +98,7 @@ jobs:
 
           loadData().catch(console.error);
           EOF
+
 
 
       - name: 🔧 更新 `models/db.js`
@@ -213,6 +211,14 @@ jobs:
           else
             echo "✅ DynamoDB Table $TABLE_NAME 已存在"
           fi
+      - name: 🔄 確保環境變數載入
+        run: |
+          set -a  # 讓 `export` 變數自動適用
+          source giftlink-backend/.env
+          set +a
+
+      - name: 🛠 測試 `DYNAMODB_TABLE` 是否正確載入
+        run: echo "DYNAMODB_TABLE=$DYNAMODB_TABLE"
 
       - name: 🔄 透過 Node.js `index.js` 將 `gifts.json` 存入 DynamoDB
         run: |
