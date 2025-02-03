@@ -19,7 +19,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-      
+
       - name: 🛠 安裝 eksctl
         run: |
           curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
@@ -29,13 +29,25 @@ jobs:
       - name: 🐳 登入 AWS ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
-      
+
       - name: ⚙️ 檢查並建立 AWS EKS 叢集
         run: |
           eksctl get cluster --name giftapp-cluster || eksctl create cluster --name giftapp-cluster --region ${{ secrets.AWS_REGION }} --nodegroup-name giftapp-nodes --node-type t3.medium --nodes 2
 
       - name: 🔧 設定 Kubeconfig
         run: aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name giftapp-cluster
+
+      - name: 🏗️ 建立 ecr-access ServiceAccount 並綁定 IAM
+        run: |
+          eksctl create iamserviceaccount \
+            --name ecr-access \
+            --namespace default \
+            --cluster giftapp-cluster \
+            --attach-policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly \
+            --override-existing-serviceaccounts \
+            --approve
+
+          echo "✅ ServiceAccount ecr-access 已建立！"
 
       - name: ⬆️ 部署 MongoDB 到 AWS EKS
         run: |
@@ -58,10 +70,11 @@ jobs:
 
           echo "✅ MongoDB 已成功運行！"
 
-      - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
+      - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR (linux/amd64)
         run: |
-          docker build ./giftlink-backend -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest
-          docker push ${{ secrets.ECR_REPO }}/giftapp-backend:latest
+          docker buildx create --use
+          docker buildx inspect --bootstrap
+          docker buildx build --platform linux/amd64 -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest --push ./giftlink-backend
 
       - name: 📦 安裝 Express 和 CORS 在 giftwebsite
         run: |
@@ -69,7 +82,7 @@ jobs:
           npm install express cors
           cd ..
 
-      - name: 🔧 更新 `deployment.yaml` 中的 Image 路徑
+      - name: 🔧 更新 `deployment.yml` 中的 Image 路徑
         run: |
           ECR_URL="${{ secrets.ECR_REPO }}"
           sed -i "s|<ECR_URL>|$ECR_URL|g" ./kubernetes/deployment.yml
@@ -77,6 +90,7 @@ jobs:
       
       - name: 🏗️ 創建 AWS ECR Secret，供 Kubernetes 拉取映像
         run: |
+          kubectl delete secret aws-ecr-secret --ignore-not-found
           kubectl create secret docker-registry aws-ecr-secret \
             --docker-server=${{ secrets.ECR_REPO }} \
             --docker-username=AWS \
@@ -112,17 +126,18 @@ jobs:
           echo "REACT_APP_BACKEND_URL=$BACKEND_URL" > ./giftlink-frontend/.env
           cat giftlink-frontend/.env  # 確認內容是否更新成功
       
-      - name: 📦 安裝 all the necessary packages in giftlink-frontend
+      - name: 📦 安裝所有必要的 packages in giftlink-frontend
         run: |
           cd ./giftlink-frontend
           npm install
           npm run build
           cd ..
 
-      - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR
+      - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR (linux/amd64)
         run: |
-          docker build ./giftwebsite -t ${{ secrets.ECR_REPO }}/giftwebsite:latest
-          docker push ${{ secrets.ECR_REPO }}/giftwebsite:latest
+          docker buildx create --use
+          docker buildx inspect --bootstrap
+          docker buildx build --platform linux/amd64 -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
 
       - name: 🚀 啟動 GiftWebsite 並輸出網址
         run: |
