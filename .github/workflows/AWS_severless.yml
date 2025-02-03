@@ -123,7 +123,11 @@ jobs:
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS --password-stdin \
           ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-          aws iam get-role-policy --role-name AppRunnerECRAccess --policy-name AmazonEC2ContainerRegistryFullAccess
+      - name: 🔍 确保 AppRunnerECRAccess 绑定了 ECR 访问权限
+        run: |
+          aws iam list-attached-role-policies --role-name AppRunnerECRAccess
+      - name: 🔍 检查 GitHub Actions 运行的 IAM 账号
+        run: aws sts get-caller-identity
 
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
         run: |
