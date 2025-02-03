@@ -214,11 +214,8 @@ jobs:
       - name: 🔄 確保環境變數載入
         run: |
           set -a  # 讓 `export` 變數自動適用
-          source giftlink-backend/.env
+          source giftlink-backend/util/import-mongo/.env
           set +a
-
-      - name: 🛠 測試 `DYNAMODB_TABLE` 是否正確載入
-        run: echo "DYNAMODB_TABLE=$DYNAMODB_TABLE"
 
       - name: 🔄 透過 Node.js `index.js` 將 `gifts.json` 存入 DynamoDB
         run: |
@@ -236,52 +233,30 @@ jobs:
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64 \
             -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest \
-            --push ./giftlink-backend
+            ./giftlink-backend
+          docker push 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest
 
       - name: 🚀 創建或更新 App Runner 服務
         run: |
-          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
-
-          if [ -z "$SERVICE_ARN" ]; then
-            echo "🚀 創建新的 App Runner 服務..."
-            aws apprunner create-service \
-              --service-name giftapp-backend \
-              --source-configuration '{
-                "ImageRepository": {
-                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
-                  "ImageRepositoryType": "ECR",
-                  "ImageConfiguration": {
-                    "Port": "3060",
-                    "RuntimeEnvironmentVariables": {
-                      "DYNAMODB_TABLE": "giftapp-data",
-                      "AWS_REGION": "${{ secrets.AWS_REGION }}"
-                    }
-                  }
-                },
-                "AuthenticationConfiguration": {
-                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
-                }
-              }' \
-              --region ${{ secrets.AWS_REGION }}
-          else
-            echo "🔄 更新 App Runner 服務..."
-            aws apprunner update-service \
-              --service-arn "$SERVICE_ARN" \
-              --source-configuration '{
-                "ImageRepository": {
-                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
-                  "ImageRepositoryType": "ECR",
-                  "ImageConfiguration": {
-                    "Port": "3060"
+          aws apprunner create-service \
+            --service-name giftapp-backend \
+            --source-configuration '{
+              "ImageRepository": {
+                "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
+                "ImageRepositoryType": "ECR",
+                "ImageConfiguration": {
+                  "Port": "3060",
+                  "RuntimeEnvironmentVariables": {
+                    "DYNAMODB_TABLE": "giftapp-data",
+                    "AWS_REGION": "${{ secrets.AWS_REGION }}"
                   }
                 }
-              }' \
-              --AuthenticationConfiguration '{
+              },
+              "AuthenticationConfiguration": {
                 "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
-              }' \
-              --region ${{ secrets.AWS_REGION }}
-          fi
-
+              }
+            }' \
+            --region us-east-1
 
 
 
