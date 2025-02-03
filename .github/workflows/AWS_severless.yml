@@ -37,11 +37,11 @@ jobs:
 
           dotenv.config();
 
-          const databaseType = process.env.DATABASE_TYPE || "MONGODB";
+          const databaseType = process.env.DATABASE_TYPE || "DYNAMODB";
 
           if (databaseType === "DYNAMODB") {
-            console.log("Using AWS DynamoDB...");
-            AWS.config.update({ region: "us-east-1" });
+            console.log("✅ 使用 AWS DynamoDB...");
+            AWS.config.update({ region: process.env.AWS_REGION || "us-east-1" });
 
             const dynamoDB = new AWS.DynamoDB.DocumentClient();
             const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
@@ -61,16 +61,8 @@ jobs:
 
             module.exports = db;
           } else {
-            console.log("Using MongoDB...");
-            const mongoose = require("mongoose");
-            const mongoUri = process.env.MONGO_URL || "mongodb://localhost:27017";
-
-            mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
-            const db = mongoose.connection;
-            db.on("error", console.error.bind(console, "MongoDB connection error:"));
-            db.once("open", () => { console.log("Connected to MongoDB"); });
-
-            module.exports = mongoose;
+            console.error("❌ 錯誤: DATABASE_TYPE 設定錯誤，請確認環境變數！");
+            process.exit(1);
           }
           EOF
 
@@ -166,7 +158,8 @@ jobs:
                   "ImageConfiguration": {
                     "Port": "3060",
                     "RuntimeEnvironmentVariables": {
-                      "DYNAMODB_TABLE": "GiftAppTable",
+                      "DATABASE_TYPE": "DYNAMODB",
+                      "DYNAMODB_TABLE": "giftapp-data",
                       "AWS_REGION": "${{ secrets.AWS_REGION }}",
                       "JWT_SECRET": "mysecret"
                     }
@@ -178,24 +171,6 @@ jobs:
               }' \
               --region ${{ secrets.AWS_REGION }}
           else
-            echo "🔄 檢查 Backend App Runner 服務狀態..."
-
-            for i in {1..30}; do
-              STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-              if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
-                echo "⌛ 目前狀態: $STATUS，等待 10 秒..."
-                sleep 10
-              else
-                break
-              fi
-            done
-
-            STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-            if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
-              echo "❌ Backend 仍在 OPERATION_IN_PROGRESS，無法更新！請稍後重試。"
-              exit 1
-            fi
-
             echo "🔄 更新 Backend App Runner 服務..."
             aws apprunner update-service \
               --service-arn "$BACKEND_ARN" \
@@ -206,7 +181,8 @@ jobs:
                   "ImageConfiguration": {
                     "Port": "3060",
                     "RuntimeEnvironmentVariables": {
-                      "DYNAMODB_TABLE": "GiftAppTable",
+                      "DATABASE_TYPE": "DYNAMODB",
+                      "DYNAMODB_TABLE": "giftapp-data",
                       "AWS_REGION": "${{ secrets.AWS_REGION }}",
                       "JWT_SECRET": "mysecret"
                     }
@@ -218,6 +194,7 @@ jobs:
               }' \
               --region ${{ secrets.AWS_REGION }}
           fi
+
       - name: 🚀 檢查 backend 到 AWS App Runner
         run: |
           aws apprunner describe-service --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }}) --region ${{ secrets.AWS_REGION }} --query "Service.Status"
