@@ -40,6 +40,23 @@ jobs:
       - name: ⬆️ 部署 MongoDB 到 AWS EKS
         run: |
           kubectl apply -f ./kubernetes/deploymongo.yml
+          
+          echo "⌛ 等待 MongoDB 部署完成..."
+          sleep 10  # 等待 Kubernetes 部署
+
+          echo "🔍 檢查 MongoDB Pods 狀態..."
+          kubectl get pods
+
+          # 取得 MongoDB Pod 的狀態
+          POD_STATUS=$(kubectl get pods -l app=mongodb -o jsonpath='{.items[0].status.phase}')
+          
+          if [ "$POD_STATUS" != "Running" ]; then
+            echo "❌ MongoDB Pod 未能成功啟動，當前狀態: $POD_STATUS"
+            kubectl describe pod -l app=mongodb  # 顯示詳細錯誤資訊
+            exit 1  # 讓 GitHub Actions 失敗，防止繼續執行
+          fi
+
+          echo "✅ MongoDB 已成功運行！"
 
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
         run: |
@@ -56,22 +73,23 @@ jobs:
           npm install express cors
           cd ..
 
-      - name: 🔍 取得 Backend 服務 URL
+      - name: 🏗️ 等待 giftapp 部署完成
         run: |
-          echo "等待 giftapp 部署啟動..."
-          kubectl rollout status deployment giftapp --timeout=120s
+          echo "⌛ 等待 giftapp 部署完成..."
+          kubectl rollout status deployment giftapp --timeout=180s || (echo "❌ giftapp 部署失敗，顯示 Pod 狀態：" && kubectl get pods && kubectl describe pod -l app=giftapp && exit 1)
 
-          echo "檢查 LoadBalancer..."
+          echo "🔍 檢查 LoadBalancer..."
           BACKEND_URL=$(kubectl get svc gift-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 
           if [ -z "$BACKEND_URL" ]; then
             echo "❌ LoadBalancer 尚未準備好，請稍後再試"
+            kubectl get svc gift-app-service
             exit 1
           fi
 
           BACKEND_URL="http://$BACKEND_URL"
-          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
           echo "✅ 服務已啟動，網址為：$BACKEND_URL"
+          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
 
       - name: 📝 更新 giftlink-frontend env
         run: |
