@@ -179,19 +179,26 @@ jobs:
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64 -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
 
-      - name: 🔧 確保 `giftwebsite` 服務暴露 LoadBalancer
+      - name: 📢 部署 giftwebsite 並確保 LoadBalancer 生效
         run: |
-          kubectl expose deployment giftwebsite --type=LoadBalancer --name=giftwebsite-service --port=80 --target-port=9000 --namespace=default --dry-run=client -o yaml | kubectl apply -f -
+          # 確保 giftwebsite Deployment 存在
+          kubectl apply -f ./kubernetes/giftwebsite-deployment.yml
           
+          # 確保 Deployment 部署成功
+          kubectl rollout status deployment giftwebsite --timeout=120s || (echo "❌ giftwebsite 部署失敗" && exit 1)
+
+          # 確保 Service 正確暴露
+          kubectl expose deployment giftwebsite --type=LoadBalancer --name=giftwebsite-service --port=80 --target-port=9000 --namespace=default --dry-run=client -o yaml | kubectl apply -f -
+
           echo "⌛ 等待 LoadBalancer 初始化..."
           sleep 30
-          
+
           GIFTWEBSITE_URL=$(kubectl get svc giftwebsite-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-          
+
           if [ -z "$GIFTWEBSITE_URL" ]; then
             echo "❌ LoadBalancer 尚未準備好，請稍後再試"
             kubectl get svc giftwebsite-service
             exit 1
           fi
-          
+
           echo "✅ 你的 GiftWebsite 可在這裡訪問: http://$GIFTWEBSITE_URL"
