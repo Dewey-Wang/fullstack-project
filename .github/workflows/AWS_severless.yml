@@ -113,21 +113,25 @@ jobs:
           const dynamoDB = DynamoDBDocumentClient.from(client);
           const TABLE_NAME = process.env.DYNAMODB_TABLE || "giftapp-data";
 
-          // **修正 `gifts.json` 路徑**
           const fs = require("fs");
           const path = require("path");
           
-          // 判斷是否在 Docker 內
+          // **判斷是否在 Docker 內**
           const isDocker = fs.existsSync("/.dockerenv");
+          
+          // **動態取得 `gifts.json` 的正確路徑**
           const giftsFilePath = isDocker
             ? "/usr/src/app/util/import-mongo/gifts.json"  // Docker 內
-            : path.join(__dirname, "../util/import-mongo/gifts.json");  // GitHub Actions 或本地
+            : path.join(__dirname, "../../util/import-mongo/gifts.json");  // GitHub Actions 或本地
+          
+          console.log(`🔍 嘗試讀取 gifts.json: ${giftsFilePath}`);
           
           if (!fs.existsSync(giftsFilePath)) {
             console.error(`❌ 找不到 gifts.json: ${giftsFilePath}`);
             process.exit(1);
           }
           
+          // **讀取 `gifts.json`**
           const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
 
           const db = {
