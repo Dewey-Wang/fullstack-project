@@ -88,7 +88,7 @@ jobs:
           app.use("*", cors());
           app.use(express.json());
 
-          const port = process.env.PORT || 3060;
+          const port = process.env.PORT || 5000;
 
           // 確保 API 正常運行
           app.get("/", (req, res) => {
@@ -170,25 +170,6 @@ jobs:
       - name: 🔍 确保 AppRunnerECRAccess 绑定了 ECR 访问权限
         run: |
           aws iam list-attached-role-policies --role-name AppRunnerECRAccess
-          aws ecr set-repository-policy \
-            --repository-name giftapp-backend \
-            --policy-text '{
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Effect": "Allow",
-                  "Principal": {
-                    "Service": "apprunner.amazonaws.com"
-                  },
-                  "Action": [
-                    "ecr:BatchGetImage",
-                    "ecr:GetDownloadUrlForLayer",
-                    "ecr:GetAuthorizationToken"
-                  ]
-                }
-              ]
-            }' \
-            --region us-east-1
           
 
       - name: 🔍 检查 GitHub Actions 运行的 IAM 账号
@@ -218,7 +199,7 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "3060",
+                    "Port": "5000",
                     "RuntimeEnvironmentVariables": {
                       "DYNAMODB_TABLE": "giftapp-data",
                       "AWS_REGION": "${{ secrets.AWS_REGION }}",
@@ -240,7 +221,7 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "3060"
+                    "Port": "5000"
                   }
                 }
               }' \
