@@ -12,12 +12,12 @@
     <title>跳轉到 GiftWebsite</title>
     <script>
         window.onload = function() {
-            window.open("https://你的網址](https://mpera36fbb.us-east-1.awsapprunner.com", "_blank");
+            window.open("https://mpera36fbb.us-east-1.awsapprunner.com", "_blank");
         };
     </script>
 </head>
 <body>
-    <p>如果沒有自動跳轉，請 <a href="https://你的網址](https://mpera36fbb.us-east-1.awsapprunner.com" target="_blank">點擊這裡</a></p>
+    <p>如果沒有自動跳轉，請 <a href="https://mpera36fbb.us-east-1.awsapprunner.com" target="_blank">點擊這裡</a></p>
 </body>
 </html>
 
