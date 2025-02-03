@@ -28,6 +28,28 @@ jobs:
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
 
+      # ✅ 檢查 Backend Docker Image 是否存在
+      - name: 🔍 檢查 Backend Image 是否存在於 AWS ECR
+        run: |
+          IMAGE_COUNT=$(aws ecr list-images --repository-name giftapp-backend --region ${{ secrets.AWS_REGION }} --query 'imageIds' | jq length)
+          if [ "$IMAGE_COUNT" -eq "0" ]; then
+            echo "❌ Backend Image 不存在，請先 Build 並 Push！"
+            exit 1
+          else
+            echo "✅ Backend Image 存在，繼續部署..."
+          fi
+
+      # ✅ 檢查 App Runner 是否有正確的 IAM 權限
+      - name: 🔍 檢查 App Runner IAM 角色
+        run: |
+          ROLE_EXISTS=$(aws iam get-role --role-name AppRunnerECRAccess --query "Role.RoleName" --output text || echo "MISSING")
+          if [ "$ROLE_EXISTS" == "MISSING" ]; then
+            echo "❌ IAM 角色 AppRunnerECRAccess 不存在，請手動建立！"
+            exit 1
+          else
+            echo "✅ IAM 角色 AppRunnerECRAccess 存在"
+          fi
+
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
         run: |
           docker buildx create --use
@@ -122,6 +144,16 @@ jobs:
               --region ${{ secrets.AWS_REGION }}
           fi
 
+      # ✅ 檢查 Backend 是否成功啟動
+      - name: 🔍 確保 Backend 服務正常運行
+        run: |
+          BACKEND_STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+          if [ "$BACKEND_STATUS" != "RUNNING" ]; then
+            echo "❌ Backend App Runner 部署失敗，狀態: $BACKEND_STATUS"
+            exit 1
+          else
+            echo "✅ Backend 服務正在運行"
+          fi
 
       - name: 取得應用程式網址
         run: |
@@ -147,6 +179,4 @@ jobs:
           git config --global user.email 'github-actions@github.com'
           git add README.md
           git commit -m "更新 README.md，顯示最新的部署網址"
-          # ✅ 使用 `GITHUB_TOKEN` 授權 `git push`
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push
