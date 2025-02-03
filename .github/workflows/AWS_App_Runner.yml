@@ -212,7 +212,7 @@ jobs:
                   }
                 },
                 "AuthenticationConfiguration": {
-                  "AccessRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AppRunnerECRAccess"
+                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
                 }
               }' \
               --region ${{ secrets.AWS_REGION }}
@@ -229,7 +229,7 @@ jobs:
                   }
                 },
                 "AuthenticationConfiguration": {
-                  "AccessRoleArn": "arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AppRunnerECRAccess"
+                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
                 }
               }' \
               --region ${{ secrets.AWS_REGION }}
