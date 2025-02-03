@@ -77,7 +77,7 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "5000"
+                    "Port": "3060"
                   }
                 },
                 "AuthenticationConfiguration": {
@@ -115,7 +115,7 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "5000"
+                    "Port": "3060"
                   }
                 },
                 "AuthenticationConfiguration": {
