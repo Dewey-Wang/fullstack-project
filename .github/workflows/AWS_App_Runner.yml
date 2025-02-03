@@ -1,11 +1,12 @@
-name: Deploy to AWS severless
+name: Completely Deploy to AWS Serverless
 
 on:
   push:
     branches:
-      - main  # 當 push 到 main 分支時觸發部署
+      - main
+
 permissions:
-  contents: write  # ✅ 允許 GitHub Actions 修改 repo 內容
+  contents: write
 
 jobs:
   deploy:
@@ -22,187 +23,93 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 🛠 安裝 eksctl
-        run: |
-          curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
-          sudo mv /tmp/eksctl /usr/local/bin
-          eksctl version  # 確認 eksctl 安裝成功
-
       - name: 🐳 登入 AWS ECR
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
 
-      - name: ⚙️ 檢查並建立 AWS EKS 叢集
+      # ✅ 檢查 Backend Docker Image 是否存在
+      - name: 🔍 檢查 Backend Image 是否存在於 AWS ECR
         run: |
-          eksctl get cluster --name giftapp-cluster || eksctl create cluster --name giftapp-cluster --region ${{ secrets.AWS_REGION }} --nodegroup-name giftapp-nodes --node-type t3.medium --nodes 2
-
-      - name: 🔧 設定 Kubeconfig
-        run: aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name giftapp-cluster
-
-      - name: 🏗️ 建立 ecr-access ServiceAccount 並綁定 IAM
-        run: |
-          eksctl create iamserviceaccount \
-            --name ecr-access \
-            --namespace default \
-            --cluster giftapp-cluster \
-            --attach-policy-arn arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly \
-            --override-existing-serviceaccounts \
-            --approve
-
-          echo "✅ ServiceAccount ecr-access 已建立！"
-
-      - name: ⬆️ 部署 MongoDB 到 AWS EKS
-        run: |
-          kubectl apply -f ./kubernetes/deploymongo.yml
-          
-          echo "⌛ 等待 MongoDB 部署完成..."
-
-          echo "🔍 檢查 MongoDB Pods 狀態..."
-          kubectl get pods
-
-          # 取得 MongoDB Pod 的狀態
-          POD_STATUS=$(kubectl get pods -l app=mongodb -o jsonpath='{.items[0].status.phase}')
-          
-          if [ "$POD_STATUS" != "Running" ]; then
-            echo "❌ MongoDB Pod 未能成功啟動，當前狀態: $POD_STATUS"
-            kubectl describe pod -l app=mongodb  # 顯示詳細錯誤資訊
-            exit 1  # 讓 GitHub Actions 失敗，防止繼續執行
-          fi
-
-          echo "✅ MongoDB 已成功運行！"
-
-      - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR (linux/amd64)
-        run: |
-          docker buildx create --use
-          docker buildx inspect --bootstrap
-          docker buildx build --platform linux/amd64 -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest --push ./giftlink-backend
-
-      - name: 📦 安裝 Express 和 CORS 在 giftwebsite
-        run: |
-          cd ./giftwebsite
-          npm install express cors
-          cd ..
-
-      - name: 🔧 更新 `deployment.yml` 中的 Image 路徑
-        run: |
-          ECR_URL="${{ secrets.ECR_REPO }}"
-          sed -i "s|<ECR_URL>|$ECR_URL|g" ./kubernetes/deployment.yml
-          cat ./kubernetes/deployment.yml  # 確保內容已更新
-      
-      - name: 🏗️ 創建 AWS ECR Secret，供 Kubernetes 拉取映像
-        run: |
-          kubectl delete secret aws-ecr-secret --ignore-not-found
-          kubectl create secret docker-registry aws-ecr-secret \
-            --docker-server=${{ secrets.ECR_REPO }} \
-            --docker-username=AWS \
-            --docker-password=$(aws ecr get-login-password --region ${{ secrets.AWS_REGION }}) \
-            --dry-run=client -o yaml | kubectl apply -f -
-          
-          echo "✅ AWS ECR Secret 已建立！"
-
-      - name: ⬆️ 部署 Backend 到 AWS EKS
-        run: |
-          kubectl delete deployment giftapp
-          kubectl apply -f ./kubernetes/deployment.yml
-          kubectl get pods -o wide
-          kubectl get nodes -o wide
-
-      - name: 🛠️ 檢查並修復 Kubernetes 節點狀態
-        run: |
-          echo "🔍 檢查 Kubernetes 節點狀態..."
-          kubectl get nodes -o wide
-
-          # 找出 NotReady 或 SchedulingDisabled 的節點
-          BAD_NODES=$(kubectl get nodes --no-headers | awk '$2 ~ /NotReady|SchedulingDisabled/ {print $1}')
-
-          if [ -n "$BAD_NODES" ]; then
-            echo "⚠️ 以下節點處於 NotReady 或 SchedulingDisabled 狀態:"
-            echo "$BAD_NODES"
-
-            for NODE in $BAD_NODES; do
-              echo "🛠️ 修復節點: $NODE"
-              
-              # 顯示節點詳細資訊
-              kubectl describe node "$NODE"
-
-              # 移除 taints 讓 Pod 可以調度
-              kubectl taint nodes "$NODE" node.kubernetes.io/not-ready:NoExecute- || true
-              kubectl taint nodes "$NODE" node.kubernetes.io/unreachable:NoExecute- || true
-              kubectl uncordon "$NODE" || true
-            done
-
-            echo "⏳ 等待節點恢復 Ready 狀態..."
-            sleep 30
-            kubectl get nodes -o wide
-          else
-            echo "✅ 所有節點均正常"
-          fi
-
-
-      - name: 🏗️ 等待 giftapp 部署完成
-        run: |
-          echo "⌛ 等待 giftapp 部署完成..."
-          kubectl rollout status deployment giftapp --timeout=120s || (echo "❌ giftapp 部署失敗，顯示 Pod 狀態：" && kubectl get pods && kubectl describe pod -l app=giftapp && exit 1)
-
-          echo "🔍 檢查 LoadBalancer..."
-          BACKEND_URL=$(kubectl get svc gift-app-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-
-          if [ -z "$BACKEND_URL" ]; then
-            echo "❌ LoadBalancer 尚未準備好，請稍後再試"
-            kubectl get svc gift-app-service
+          IMAGE_COUNT=$(aws ecr list-images --repository-name giftapp-backend --region ${{ secrets.AWS_REGION }} --query 'imageIds' | jq length)
+          if [ "$IMAGE_COUNT" -eq "0" ]; then
+            echo "❌ Backend Image 不存在，請先 Build 並 Push！"
             exit 1
+          else
+            echo "✅ Backend Image 存在，繼續部署..."
           fi
 
-          BACKEND_URL="http://$BACKEND_URL"
-          echo "✅ 服務已啟動，網址為：$BACKEND_URL"
-          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+      # ✅ 檢查 App Runner 是否有正確的 IAM 權限
+      - name: 🔍 檢查 App Runner IAM 角色
+        run: |
+          ROLE_EXISTS=$(aws iam get-role --role-name AppRunnerECRAccess --query "Role.RoleName" --output text || echo "MISSING")
+          if [ "$ROLE_EXISTS" == "MISSING" ]; then
+            echo "❌ IAM 角色 AppRunnerECRAccess 不存在，請手動建立！"
+            exit 1
+          else
+            echo "✅ IAM 角色 AppRunnerECRAccess 存在"
+          fi
 
-      - name: 📝 更新 giftlink-frontend env
-        run: |
-          echo "REACT_APP_BACKEND_URL=$BACKEND_URL" > ./giftlink-frontend/.env
-          cat giftlink-frontend/.env  # 確認內容是否更新成功
-      
-      - name: 📦 安裝express and cors in giftwebsite
-        run: |
-          cd ./giftwebsite
-          npm install express cors
-          cd ..
-          
-      - name: 📦 安裝所有必要的 packages in giftlink-frontend
-        run: |
-          cd ./giftlink-frontend
-          npm install
-          npm run build
-          cd ..
-
-      - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR (linux/amd64)
+      - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
         run: |
           docker buildx create --use
           docker buildx inspect --bootstrap
-          docker buildx build --platform linux/amd64 -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
-    
-      - name: 🔧 更新 `giftwebsite-deployment.yml` 中的 Image 路徑
-        run: |
-          ECR_URL="${{ secrets.ECR_REPO }}"
-          sed -i "s|<ECR_URL>|$ECR_URL|g" ./kubernetes/giftwebsite-deployment.yml
-          cat ./kubernetes/giftwebsite-deployment.yml  # 確保內容已更新
-      
-      - name: ⬆️ 部署 giftwebsite 到 AWS EKS
-        run: |
-         # 確保 giftwebsite Deployment 存在
-          kubectl delete deployment giftwebsite
-          kubectl apply -f ./kubernetes/giftwebsite-deployment.yml
-          kubectl get pods -o wide
-          kubectl get nodes -o wide
-          kubectl describe pod -l app=giftwebsite
-          kubectl get events --sort-by=.metadata.creationTimestamp
+          docker buildx build --platform linux/amd64 \
+            -t ${{ secrets.ECR_REPO }}/giftapp-backend:latest --push ./giftlink-backend
 
-      - name: 🚀 部署 giftwebsite 到 AWS App Runner
+      - name: 🏗️ 建立 Frontend Docker Image 並推送到 AWS ECR
         run: |
-          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
-          
-          if [ -z "$SERVICE_ARN" ]; then
-            echo "🔄 創建 App Runner 服務..."
+          docker buildx create --use
+          docker buildx inspect --bootstrap
+          docker buildx build --platform linux/amd64 \
+            -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
+
+      - name: 🚀 部署 Backend 到 AWS App Runner
+        run: |
+          BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+
+          if [ -z "$BACKEND_ARN" ]; then
+            echo "🔄 創建 Backend App Runner 服務..."
+            aws apprunner create-service \
+              --service-name giftapp-backend \
+              --source-configuration '{
+                "ImageRepository": {
+                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
+                  "ImageRepositoryType": "ECR",
+                  "ImageConfiguration": {
+                    "Port": "5000"
+                  }
+                },
+                "AuthenticationConfiguration": {
+                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
+                }
+              }' \
+              --region ${{ secrets.AWS_REGION }}
+          else
+            echo "🔄 更新 Backend App Runner 服務..."
+            aws apprunner update-service \
+              --service-arn "$BACKEND_ARN" \
+              --source-configuration '{
+                "ImageRepository": {
+                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
+                  "ImageRepositoryType": "ECR",
+                  "ImageConfiguration": {
+                    "Port": "5000"
+                  }
+                },
+                "AuthenticationConfiguration": {
+                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
+                }
+              }' \
+              --region ${{ secrets.AWS_REGION }}
+          fi
+
+      - name: 🚀 部署 Frontend 到 AWS App Runner
+        run: |
+          FRONTEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+
+          if [ -z "$FRONTEND_ARN" ]; then
+            echo "🔄 創建 Frontend App Runner 服務..."
             aws apprunner create-service \
               --service-name giftwebsite \
               --source-configuration '{
@@ -219,9 +126,9 @@ jobs:
               }' \
               --region ${{ secrets.AWS_REGION }}
           else
-            echo "🔄 更新 App Runner 服務..."
+            echo "🔄 更新 Frontend App Runner 服務..."
             aws apprunner update-service \
-              --service-arn "$SERVICE_ARN" \
+              --service-arn "$FRONTEND_ARN" \
               --source-configuration '{
                 "ImageRepository": {
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftwebsite:latest",
@@ -237,21 +144,26 @@ jobs:
               --region ${{ secrets.AWS_REGION }}
           fi
 
-          echo "⌛ 等待 App Runner 部署完成..."
-          sleep 30
-
-          # 取得 App Runner 服務的網址
-          GIFTWEBSITE_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
-
-          if [ -z "$GIFTWEBSITE_URL" ]; then
-            echo "❌ App Runner 部署失敗"
+      # ✅ 檢查 Backend 是否成功啟動
+      - name: 🔍 確保 Backend 服務正常運行
+        run: |
+          BACKEND_STATUS=$(aws apprunner describe-service --service-arn "$BACKEND_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+          if [ "$BACKEND_STATUS" != "RUNNING" ]; then
+            echo "❌ Backend App Runner 部署失敗，狀態: $BACKEND_STATUS"
             exit 1
+          else
+            echo "✅ Backend 服務正在運行"
           fi
 
-          echo "✅ GiftWebsite 可在這裡訪問: $GIFTWEBSITE_URL"
-          echo "GIFTWEBSITE_URL=$GIFTWEBSITE_URL" >> $GITHUB_ENV
+      - name: 取得應用程式網址
+        run: |
+          BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
+          FRONTEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
 
-
+          echo "✅ Backend URL: $BACKEND_URL"
+          echo "✅ Frontend URL: $FRONTEND_URL"
+          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+          echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_ENV
 
       - name: 📝 更新 README.md 顯示網站網址
         run: |
@@ -259,7 +171,7 @@ jobs:
           echo "" >> README.md
           echo "✅ 你的網站已部署 🎉" >> README.md
           echo "" >> README.md
-          echo '🔗 <a href="https://'$GIFTWEBSITE_URL'" target="_blank">**訪問 GiftWebsite**</a>' >> README.md
+          echo '🔗 <a href="https://'$FRONTEND_URL'" target="_blank">**訪問 GiftWebsite**</a>' >> README.md
           echo "" >> README.md
           echo "🚀 每次 Push 到 main 都會自動部署到 AWS App Runner！" >> README.md
           
@@ -267,7 +179,4 @@ jobs:
           git config --global user.email 'github-actions@github.com'
           git add README.md
           git commit -m "更新 README.md，顯示最新的部署網址"
-
-          # ✅ 使用 `GITHUB_TOKEN` 授權 `git push`
-          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push
