@@ -195,21 +195,39 @@ jobs:
           kubectl describe pod -l app=giftwebsite
           kubectl get events --sort-by=.metadata.creationTimestamp
 
-        
       - name: 🚀 部署 giftwebsite 到 AWS App Runner
         run: |
-          # 建立或更新 AWS App Runner 服務
+          # 嘗試建立 AWS App Runner 服務
           aws apprunner create-service \
             --service-name giftwebsite \
-            --source-configuration ImageRepository={"ImageIdentifier=${{ secrets.ECR_REPO }}/giftwebsite:latest","ImageRepositoryType":"ECR","ImageConfiguration":{"Port":"9000"}} \
+            --source-configuration '{
+              "ImageRepository": {
+                "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftwebsite:latest",
+                "ImageRepositoryType": "ECR",
+                "ImageConfiguration": {
+                  "Port": "9000"
+                }
+              }
+            }' \
             --region ${{ secrets.AWS_REGION }} || \
-          aws apprunner update-service --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text) \
-            --source-configuration ImageRepository={"ImageIdentifier=${{ secrets.ECR_REPO }}/giftwebsite:latest","ImageRepositoryType":"ECR","ImageConfiguration":{"Port":"9000"}} \
+          # 如果服務已存在，則更新它
+          aws apprunner update-service \
+            --service-arn $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }}) \
+            --source-configuration '{
+              "ImageRepository": {
+                "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftwebsite:latest",
+                "ImageRepositoryType": "ECR",
+                "ImageConfiguration": {
+                  "Port": "9000"
+                }
+              }
+            }' \
             --region ${{ secrets.AWS_REGION }}
 
           echo "⌛ 等待 App Runner 部署完成..."
           sleep 30
 
+          # 取得 App Runner 服務的網址
           GIFTWEBSITE_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
 
           if [ -z "$GIFTWEBSITE_URL" ]; then
@@ -219,6 +237,7 @@ jobs:
 
           echo "✅ GiftWebsite 可在這裡訪問: $GIFTWEBSITE_URL"
           echo "GIFTWEBSITE_URL=$GIFTWEBSITE_URL" >> $GITHUB_ENV
+
 
       - name: 📝 更新 README.md 顯示網站網址
         run: |
