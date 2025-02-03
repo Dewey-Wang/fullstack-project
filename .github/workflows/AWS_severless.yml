@@ -64,7 +64,7 @@ jobs:
           docker buildx build --platform linux/amd64 \
             -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
 
-     - name: 🚀 部署 Backend 到 AWS App Runner
+      - name: 🚀 部署 Backend 到 AWS App Runner
         run: |
           BACKEND_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
       
