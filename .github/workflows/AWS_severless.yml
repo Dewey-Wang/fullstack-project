@@ -140,43 +140,12 @@ jobs:
             echo "✅ DynamoDB Table $TABLE_NAME 已存在"
           fi
 
-      - name: 🔐 確保 IAM Role 有權限
-        run: |
-          aws iam put-role-policy \
-            --role-name AppRunnerECRAccess \
-            --policy-name AppRunnerDynamoDBPolicy \
-            --policy-document '{
-              "Version": "2012-10-17",
-              "Statement": [
-                {
-                  "Effect": "Allow",
-                  "Action": [
-                    "dynamodb:PutItem",
-                    "dynamodb:GetItem",
-                    "dynamodb:Scan",
-                    "dynamodb:DescribeTable",
-                    "dynamodb:UpdateItem"
-                  ],
-                  "Resource": "arn:aws:dynamodb:${{ secrets.AWS_REGION }}:253490795451:table/giftapp-data"
-                }
-              ]
-            }'
             
       - name: 🔐 登录 AWS ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS --password-stdin \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-      - name: 🔍 确保 AppRunnerECRAccess 绑定了 ECR 访问权限
-        run: |
-          aws iam list-attached-role-policies --role-name AppRunnerECRAccess
-          
-
-      - name: 🔍 检查 GitHub Actions 运行的 IAM 账号
-        run: |
-          aws sts get-caller-identity
-          aws ecr get-repository-policy --repository-name giftapp-backend --region us-east-1
-
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com  
 
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
         run: |
@@ -203,7 +172,6 @@ jobs:
                     "RuntimeEnvironmentVariables": {
                       "DYNAMODB_TABLE": "giftapp-data",
                       "AWS_REGION": "${{ secrets.AWS_REGION }}",
-                      "JWT_SECRET": "mysecret"
                     }
                   }
                 },
