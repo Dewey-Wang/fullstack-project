@@ -188,7 +188,10 @@ jobs:
             echo "✅ DynamoDB Table $TABLE_NAME 已存在"
           fi
 
-            
+      - name: 🔄 透過 Node.js `index.js` 將 `gifts.json` 存入 DynamoDB
+        run: |
+          node giftlink-backend/util/import-mongo/index.js
+
       - name: 🔐 登录 AWS ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
