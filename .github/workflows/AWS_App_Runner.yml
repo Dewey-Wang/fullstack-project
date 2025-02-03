@@ -259,7 +259,7 @@ jobs:
           echo "" >> README.md
           echo "✅ 你的網站已部署 🎉" >> README.md
           echo "" >> README.md
-          echo "🔗 **網址：[$GIFTWEBSITE_URL]($GIFTWEBSITE_URL)**" >> README.md
+          echo '🔗 <a href="https://'$GIFTWEBSITE_URL'" target="_blank">**訪問 GiftWebsite**</a>' >> README.md
           echo "" >> README.md
           echo "🚀 每次 Push 到 main 都會自動部署到 AWS App Runner！" >> README.md
           
