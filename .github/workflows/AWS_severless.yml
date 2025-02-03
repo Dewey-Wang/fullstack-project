@@ -151,49 +151,57 @@ jobs:
             echo "🔄 創建 Backend App Runner 服務..."
             aws apprunner create-service \
               --service-name giftapp-backend \
-              --source-configuration '{
-                "ImageRepository": {
-                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
-                  "ImageRepositoryType": "ECR",
-                  "ImageConfiguration": {
-                    "Port": "3060",
-                    "RuntimeEnvironmentVariables": {
-                      "DATABASE_TYPE": "DYNAMODB",
-                      "DYNAMODB_TABLE": "giftapp-data",
-                      "AWS_REGION": "${{ secrets.AWS_REGION }}",
-                      "JWT_SECRET": "mysecret"
-                    }
+              --source-configuration "{
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"${{ secrets.ECR_REPO }}/giftapp-backend:latest\",
+                  \"ImageRepositoryType\": \"ECR\",
+                  \"ImageConfiguration\": {
+                    \"Port\": \"3060\"
                   }
                 },
-                "AuthenticationConfiguration": {
-                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
+                \"AuthenticationConfiguration\": {
+                  \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
                 }
-              }' \
+              }" \
+              --instance-configuration "{
+                \"Cpu\": \"1 vCPU\",
+                \"Memory\": \"2 GB\",
+                \"InstanceRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\",
+                \"EnvironmentVariables\": [
+                  {\"Name\": \"DATABASE_TYPE\", \"Value\": \"DYNAMODB\"},
+                  {\"Name\": \"DYNAMODB_TABLE\", \"Value\": \"giftapp-data\"},
+                  {\"Name\": \"AWS_REGION\", \"Value\": \"${{ secrets.AWS_REGION }}\"},
+                  {\"Name\": \"JWT_SECRET\", \"Value\": \"mysecret\"}
+                ]
+              }" \
               --region ${{ secrets.AWS_REGION }}
           else
             echo "🔄 更新 Backend App Runner 服務..."
             aws apprunner update-service \
               --service-arn "$BACKEND_ARN" \
-              --source-configuration '{
-                "ImageRepository": {
-                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
-                  "ImageRepositoryType": "ECR",
-                  "ImageConfiguration": {
-                    "Port": "3060",
-                    "RuntimeEnvironmentVariables": {
-                      "DATABASE_TYPE": "DYNAMODB",
-                      "DYNAMODB_TABLE": "giftapp-data",
-                      "AWS_REGION": "${{ secrets.AWS_REGION }}",
-                      "JWT_SECRET": "mysecret"
-                    }
+              --source-configuration "{
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"${{ secrets.ECR_REPO }}/giftapp-backend:latest\",
+                  \"ImageRepositoryType\": \"ECR\",
+                  \"ImageConfiguration\": {
+                    \"Port\": \"3060\"
                   }
                 },
-                "AuthenticationConfiguration": {
-                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
+                \"AuthenticationConfiguration\": {
+                  \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
                 }
-              }' \
+              }" \
+              --instance-configuration "{
+                \"EnvironmentVariables\": [
+                  {\"Name\": \"DATABASE_TYPE\", \"Value\": \"DYNAMODB\"},
+                  {\"Name\": \"DYNAMODB_TABLE\", \"Value\": \"giftapp-data\"},
+                  {\"Name\": \"AWS_REGION\", \"Value\": \"${{ secrets.AWS_REGION }}\"},
+                  {\"Name\": \"JWT_SECRET\", \"Value\": \"mysecret\"}
+                ]
+              }" \
               --region ${{ secrets.AWS_REGION }}
           fi
+
 
       - name: 🚀 檢查 backend 到 AWS App Runner
         run: |
