@@ -89,10 +89,7 @@ jobs:
 
           CMD ["node", "app.js"]
           EOF
-      - name: 🔍 確認 Docker 內 `gifts.json` 是否存在
-        run: |
-          docker build -t giftapp-backend .
-          docker run --rm giftapp-backend ls -al /usr/src/app/util/import-mongo/
+      
       - name: 📂 確認 GitHub Actions 內部路徑
         run: |
           pwd
