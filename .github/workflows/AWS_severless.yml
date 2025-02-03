@@ -54,7 +54,7 @@ jobs:
         run: |
           cat <<EOF > giftlink-backend/util/import-mongo/.env
           DYNAMODB_TABLE=giftapp-data
-          AWS_REGION=us-east-1
+          DATASRC=gifts.json
           EOF
       - name: 🔧 確保 `.env` 設置 `DYNAMODB_TABLE`
         run: |
@@ -65,6 +65,9 @@ jobs:
           
       - name: 🔄 輸出 `.env` 來確認設定
         run: cat giftlink-backend/.env
+      - name: 🛠 測試 `DYNAMODB_TABLE` 是否正確讀取
+        run: |
+          echo "DYNAMODB_TABLE=$DYNAMODB_TABLE"
 
       - name: 🔧 修正 `index.js` 確保環境變數讀取正確
         run: |
