@@ -121,7 +121,8 @@ jobs:
       - name: 🔐 登录 AWS ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
-          docker login --username AWS --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          docker login --username AWS --password-stdin \
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
           aws iam get-role-policy --role-name AppRunnerECRAccess --policy-name AmazonEC2ContainerRegistryFullAccess
 
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
