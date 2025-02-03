@@ -73,8 +73,15 @@ jobs:
           npm install express cors
           cd ..
 
+      - name: 🔧 更新 `deployment.yaml` 中的 Image 路徑
+        run: |
+          ECR_URL="${{ secrets.ECR_REPO }}"
+          sed -i "s|<ECR_URL>|$ECR_URL|g" ./kubernetes/deployment.yaml
+          cat ./kubernetes/deployment.yaml  # 確保內容已更新
+
       - name: 🏗️ 等待 giftapp 部署完成
         run: |
+          kubectl apply -f ./kubernetes/deployment.yaml
           echo "⌛ 等待 giftapp 部署完成..."
           kubectl rollout status deployment giftapp --timeout=180s || (echo "❌ giftapp 部署失敗，顯示 Pod 狀態：" && kubectl get pods && kubectl describe pod -l app=giftapp && exit 1)
 

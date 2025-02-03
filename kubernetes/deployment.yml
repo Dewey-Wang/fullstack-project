@@ -16,11 +16,11 @@ spec:
     spec:
       containers:
       - name: giftapp-container
-        image: ${{ secrets.ECR_REPO }}/giftapp-backend:latest
+        image: <ECR_URL>/giftapp-backend:latest   # ✅ 這裡換成你的 ECR Image
         ports:
         - containerPort: 3060
       imagePullSecrets:
-      - name: icr
+      - name: aws-ecr-secret  # ✅ 確保有 `kubectl create secret` 建立 AWS ECR 授權
 
 ---
 apiVersion: v1
