@@ -66,7 +66,12 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "3060"
+                    "Port": "3060",
+                    "RuntimeEnvironmentVariables": [
+                      {"Name": "DATABASE_TYPE", "Value": "DYNAMODB"},
+                      {"Name": "DYNAMODB_TABLE", "Value": "giftapp-data"},
+                      {"Name": "JWT_SECRET", "Value": "mysecret"}
+                    ]
                   }
                 },
                 "AuthenticationConfiguration": {
@@ -76,12 +81,7 @@ jobs:
               --region ${{ secrets.AWS_REGION }} \
               --instance-configuration '{
                 "Cpu": "1 vCPU",
-                "Memory": "2 GB",
-                "EnvironmentVariables": [
-                  {"Name": "DATABASE_TYPE", "Value": "DYNAMODB"},
-                  {"Name": "DYNAMODB_TABLE", "Value": "giftapp-data"},
-                  {"Name": "JWT_SECRET", "Value": "mysecret"}
-                ]
+                "Memory": "2 GB"
               }'
           else
             echo "🔄 更新 Backend App Runner 服務..."
@@ -92,7 +92,12 @@ jobs:
                   "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
                   "ImageRepositoryType": "ECR",
                   "ImageConfiguration": {
-                    "Port": "3060"
+                    "Port": "3060",
+                    "RuntimeEnvironmentVariables": [
+                      {"Name": "DATABASE_TYPE", "Value": "DYNAMODB"},
+                      {"Name": "DYNAMODB_TABLE", "Value": "giftapp-data"},
+                      {"Name": "JWT_SECRET", "Value": "mysecret"}
+                    ]
                   }
                 },
                 "AuthenticationConfiguration": {
@@ -101,11 +106,8 @@ jobs:
               }' \
               --region ${{ secrets.AWS_REGION }} \
               --instance-configuration '{
-                "EnvironmentVariables": [
-                  {"Name": "DATABASE_TYPE", "Value": "DYNAMODB"},
-                  {"Name": "DYNAMODB_TABLE", "Value": "giftapp-data"},
-                  {"Name": "JWT_SECRET", "Value": "mysecret"}
-                ]
+                "Cpu": "1 vCPU",
+                "Memory": "2 GB"
               }'
           fi
 
