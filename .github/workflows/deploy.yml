@@ -105,6 +105,38 @@ jobs:
           kubectl get pods -o wide
           kubectl get nodes -o wide
 
+      - name: 🛠️ 檢查並修復 Kubernetes 節點狀態
+        run: |
+          echo "🔍 檢查 Kubernetes 節點狀態..."
+          kubectl get nodes -o wide
+
+          # 找出 NotReady 或 SchedulingDisabled 的節點
+          BAD_NODES=$(kubectl get nodes --no-headers | awk '$2 ~ /NotReady|SchedulingDisabled/ {print $1}')
+
+          if [ -n "$BAD_NODES" ]; then
+            echo "⚠️ 以下節點處於 NotReady 或 SchedulingDisabled 狀態:"
+            echo "$BAD_NODES"
+
+            for NODE in $BAD_NODES; do
+              echo "🛠️ 修復節點: $NODE"
+              
+              # 顯示節點詳細資訊
+              kubectl describe node "$NODE"
+
+              # 移除 taints 讓 Pod 可以調度
+              kubectl taint nodes "$NODE" node.kubernetes.io/not-ready:NoExecute- || true
+              kubectl taint nodes "$NODE" node.kubernetes.io/unreachable:NoExecute- || true
+              kubectl uncordon "$NODE" || true
+            done
+
+            echo "⏳ 等待節點恢復 Ready 狀態..."
+            sleep 30
+            kubectl get nodes -o wide
+          else
+            echo "✅ 所有節點均正常"
+          fi
+
+
       - name: 🏗️ 等待 giftapp 部署完成
         run: |
           echo "⌛ 等待 giftapp 部署完成..."
