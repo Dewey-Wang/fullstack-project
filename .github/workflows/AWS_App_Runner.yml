@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main  # 當 push 到 main 分支時觸發部署
+permissions:
+  contents: write  # ✅ 允許 GitHub Actions 修改 repo 內容
 
 jobs:
   deploy:
@@ -266,6 +268,6 @@ jobs:
           git add README.md
           git commit -m "更新 README.md，顯示最新的部署網址"
 
-          # **使用 GitHub Token 授權**
+          # ✅ 使用 `GITHUB_TOKEN` 授權 `git push`
           git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           git push
