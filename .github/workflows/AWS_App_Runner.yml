@@ -30,23 +30,26 @@ jobs:
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64 -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
 
-      - name: 🔧 部署到 AWS App Runner
+      - name: 🚀 部署 giftwebsite 到 AWS App Runner
         run: |
-          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text)
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
 
           if [ -z "$SERVICE_ARN" ]; then
             echo "⏳ 創建新的 App Runner 服務..."
             aws apprunner create-service \
               --service-name giftwebsite \
               --source-configuration ImageRepository="{ImageIdentifier=${{ secrets.ECR_REPO }}/giftwebsite:latest,ImageRepositoryType=ECR}" \
+              --instance-configuration InstanceRoleArn=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AppRunnerECRRole \
               --region ${{ secrets.AWS_REGION }}
           else
             echo "🔄 更新現有的 App Runner 服務..."
             aws apprunner update-service \
               --service-arn "$SERVICE_ARN" \
               --source-configuration ImageRepository="{ImageIdentifier=${{ secrets.ECR_REPO }}/giftwebsite:latest,ImageRepositoryType=ECR}" \
+              --instance-configuration InstanceRoleArn=arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/AppRunnerECRRole \
               --region ${{ secrets.AWS_REGION }}
           fi
+
 
       - name: 🏗️ 等待 App Runner 部署完成
         run: |
