@@ -178,7 +178,13 @@ jobs:
           docker buildx create --use
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64 -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
-     
+    
+     - name: 🔧 更新 `giftwebsite-deployment.yml` 中的 Image 路徑
+        run: |
+          ECR_URL="${{ secrets.ECR_REPO }}"
+          sed -i "s|<ECR_URL>|$ECR_URL|g" ./kubernetes/giftwebsite-deployment.yml
+          cat ./kubernetes/giftwebsite-deployment.yml  # 確保內容已更新
+      
       - name: ⬆️ 部署 giftwebsite 到 AWS EKS
         run: |
          # 確保 giftwebsite Deployment 存在
