@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: giftwebsite
+  namespace: default
+  labels:
+    app: giftwebsite
+spec:
+  replicas: 2  # 可以調整為 1 以節省資源
+  selector:
+    matchLabels:
+      app: giftwebsite
+  template:
+    metadata:
+      labels:
+        app: giftwebsite
+    spec:
+      containers:
+        - name: giftwebsite-container
+          image: <ECR_URL>/giftwebsite:latest  # 這裡會被 GitHub Actions 替換
+          ports:
+            - containerPort: 9000
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          env:
+            - name: NODE_ENV
+              value: "production"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9000
+            initialDelaySeconds: 5
+            periodSeconds: 3
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: giftwebsite-service
+  namespace: default
+  labels:
+    app: giftwebsite
+spec:
+  type: LoadBalancer
+  selector:
+    app: giftwebsite
+  ports:
+    - protocol: TCP
+      port: 80  # 外部訪問的端口
+      targetPort: 9000  # 內部對應的 containerPort
