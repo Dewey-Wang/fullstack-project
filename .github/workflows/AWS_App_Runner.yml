@@ -1,0 +1,81 @@
+name: Deploy to AWS App Runner
+
+on:
+  push:
+    branches:
+      - main  # 當 push 到 main 分支時觸發部署
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 🚀 檢出程式碼
+        uses: actions/checkout@v4
+
+      - name: 🔐 設定 AWS CLI
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: 🐳 登入 AWS ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ secrets.ECR_REPO }}
+
+      - name: 🏗️ 建立並推送 Docker Image 到 AWS ECR
+        run: |
+          docker buildx create --use
+          docker buildx inspect --bootstrap
+          docker buildx build --platform linux/amd64 -t ${{ secrets.ECR_REPO }}/giftwebsite:latest --push ./giftwebsite
+
+      - name: 🔧 部署到 AWS App Runner
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text)
+
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "⏳ 創建新的 App Runner 服務..."
+            aws apprunner create-service \
+              --service-name giftwebsite \
+              --source-configuration ImageRepository="{ImageIdentifier=${{ secrets.ECR_REPO }}/giftwebsite:latest,ImageRepositoryType=ECR}" \
+              --region ${{ secrets.AWS_REGION }}
+          else
+            echo "🔄 更新現有的 App Runner 服務..."
+            aws apprunner update-service \
+              --service-arn "$SERVICE_ARN" \
+              --source-configuration ImageRepository="{ImageIdentifier=${{ secrets.ECR_REPO }}/giftwebsite:latest,ImageRepositoryType=ECR}" \
+              --region ${{ secrets.AWS_REGION }}
+          fi
+
+      - name: 🏗️ 等待 App Runner 部署完成
+        run: |
+          echo "⌛ 等待 App Runner 服務啟動..."
+          sleep 60  # 等待 1 分鐘讓 App Runner 完成部署
+
+          APP_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text)
+
+          if [ -z "$APP_URL" ]; then
+            echo "❌ 部署失敗，無法取得 App Runner URL"
+            exit 1
+          fi
+
+          echo "✅ App Runner 部署完成，網址為: $APP_URL"
+          echo "APP_URL=$APP_URL" >> $GITHUB_ENV
+
+      - name: 📝 更新 README.md 顯示部署網址
+        run: |
+          APP_URL=$(cat $GITHUB_ENV | grep APP_URL | cut -d '=' -f2)
+          echo "### 🚀 GiftWebsite 部署成功 🎉" > README.md
+          echo "" >> README.md
+          echo "應用程式已成功部署至 AWS App Runner。" >> README.md
+          echo "" >> README.md
+          echo "🔗 [點擊這裡訪問 GiftWebsite]($APP_URL)" >> README.md
+
+      - name: 🚀 Commit 更新的 README.md
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add README.md
+          git commit -m "更新 README.md: 部署網址"
+          git push
