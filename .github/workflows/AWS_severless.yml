@@ -312,14 +312,11 @@ jobs:
           cat <<EOF > giftwebsite/server.js
           const express = require("express");
           const path = require("path");
-          const cors = require("cors");
           const { createProxyMiddleware } = require("http-proxy-middleware");
 
           const app = express();
           const PORT = 9000;
-          const BACKEND_URL = ${{ env.BACKEND_URL }};
-
-          app.use(cors());
+          const BACKEND_URL = ${BACKEND_URL};
 
           // 代理 API 請求到 `giftlink-backend`
           app.use("/api", createProxyMiddleware({
@@ -331,7 +328,7 @@ jobs:
           app.use(express.static(path.join(__dirname, "build")));
 
           // 讓 React 處理所有路由
-          app.get("*", (req, res) => {
+          app.get("*", function (req, res) {
             res.sendFile(path.join(__dirname, "build", "index.html"));
           });
 
@@ -342,35 +339,36 @@ jobs:
           });
           EOF
 
+
       - name: 🛠️ 建立 `giftwebsite/Dockerfile`
         run: |
           cat <<EOF > giftwebsite/Dockerfile
           # 1️⃣ 建置 React 前端
-          # Use Node.js LTS version
-          FROM node:14.17.0-slim
-          
-          # Set working directory
+          FROM node:18-alpine AS build
           WORKDIR /usr/src/app
-          
-          # Copy package.json and package-lock.json files
-          COPY package*.json ./
-          
-          # Install dependencies
+          COPY package.json package-lock.json ./
           RUN npm install --production
-          
-          # Copy application code
           COPY . .
-
+          
           # 2️⃣ 運行 Express 伺服器，代理 API
           FROM node:18-alpine
           WORKDIR /app
-          COPY --from=build /app/package.json .
-          COPY --from=build /app/node_modules ./node_modules
-          COPY --from=build /app/build ./build
-          COPY --from=build /app/server.js .
+          
+          # 複製必要檔案
+          COPY --from=build /usr/src/app/package.json .
+          COPY --from=build /usr/src/app/node_modules ./node_modules
+          COPY --from=build /usr/src/app/build ./build
+          COPY --from=build /usr/src/app/server.js .
+          
+          # 設定環境變數
+          ARG BACKEND_URL
+          ENV BACKEND_URL=${BACKEND_URL}
           ENV PORT=9000
-          ENV BACKEND_URL=${{ env.BACKEND_URL }}
+          
+          # 開放應用端口
           EXPOSE 9000
+          
+          # 啟動應用
           CMD ["node", "server.js"]
           EOF
 
@@ -380,12 +378,12 @@ jobs:
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64,linux/arm64 \
             -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest \
+            --build-arg BACKEND_URL=${{ env.BACKEND_URL }} \
             --push ./giftwebsite
 
       - name: 🚀 部署 `giftwebsite` 到 AWS App Runner
         run: |
           SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
-          echo "🔍 取得的 SERVICE_ARN: $SERVICE_ARN"
 
           if [ "$SERVICE_ARN" == "None" ] || [ -z "$SERVICE_ARN" ]; then
               echo "🔄 創建 App Runner 服務..."
@@ -428,6 +426,7 @@ jobs:
                 }" \
                 --region ${{ secrets.AWS_REGION }}
           fi
+
 
       - name: 🔎 獲取 `giftwebsite` 部署網址
         run: |
