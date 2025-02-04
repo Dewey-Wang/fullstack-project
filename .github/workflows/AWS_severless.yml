@@ -290,7 +290,7 @@ jobs:
               --region ${{ secrets.AWS_REGION }}
           fi
           
-      - name: 🔧 更新 `giftlink-frontend/.env`
+      - name: 🔧 更新 `giftlink-frontend/src/config.js`
         run: |
           BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
           
@@ -298,20 +298,16 @@ jobs:
               echo "❌ 無法取得 Backend URL，部署中止"
               exit 1
           fi
-          
-          echo "REACT_APP_BACKEND_URL=https://$BACKEND_URL/" > giftlink-frontend/.env
-          cat giftlink-frontend/.env  # 確保內容更新
-
-      - name: 🔧 更新 `giftlink-frontend/src/config.js`
-        run: |
+          echo "🔍 取得的 Backend URL: https://$BACKEND_URL/"
           cat <<EOF > giftlink-frontend/src/config.js
           const config = {
-            backendUrl: https://$BACKEND_URL/,
+            backendUrl: "https://$BACKEND_URL/",
           };
-          
-          console.log(`backendUrl in config.js: ${config.backendUrl}`)
-          export {config as urlConfig}
+          console.log("🔍 backendUrl in config.js:", config.backendUrl);
+          export { config as urlConfig };
           EOF
+          cat giftlink-frontend/src/config.js  # 確保內容正確
+
       - name: 🔍 查看 `.env` 檔案內容 (完整顯示)
         run: |
           cd giftlink-frontend
