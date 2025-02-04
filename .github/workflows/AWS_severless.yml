@@ -80,7 +80,7 @@ jobs:
               const hashedPassword = await bcryptjs.hash("password123", salt);
               
               const testUser = {
-                  id: `USER-${Date.now()}`,
+                  id: "111111",
                   email: "testuser@example.com",
                   firstName: "Test",
                   lastName: "User",
