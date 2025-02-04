@@ -106,18 +106,32 @@ jobs:
           cat <<EOF > giftlink-backend/models/db.js
           require("dotenv").config();
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-          const { DynamoDBDocumentClient } = require("@aws-sdk/lib-dynamodb");
+          const { DynamoDBDocumentClient, ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
           
-          // AWS DynamoDB 連接設定
-          const client = new DynamoDBClient({ region: process.env.AWS_REGION });
-          const dbInstance = DynamoDBDocumentClient.from(client);
+          const client = new DynamoDBClient({
+              region: process.env.AWS_REGION,
+              credentials: {
+                  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+                  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+              },
+          });
+          
+          const db = DynamoDBDocumentClient.from(client);
           const TABLE_NAME = process.env.DYNAMODB_TABLE;
           
-          async function connectToDatabase() {
-              return dbInstance;
+          async function getGifts() {
+              const params = new ScanCommand({ TableName: TABLE_NAME });
+              const data = await db.send(params);
+              return data.Items;
           }
           
-          module.exports = { connectToDatabase, TABLE_NAME };
+          async function addGift(gift) {
+              const params = new PutCommand({ TableName: TABLE_NAME, Item: gift });
+              await db.send(params);
+              return gift;
+          }
+          
+          module.exports = { getGifts, addGift };
           EOF
 
 
@@ -154,44 +168,46 @@ jobs:
           cat <<EOF > giftlink-backend/app.js
           const express = require("express");
           const cors = require("cors");
-          const db = require("./models/db");
-
+          const { getGifts, addGift } = require("./models/db");
+          
           const app = express();
-          app.use("*", cors());
+          app.use(cors());
           app.use(express.json());
-
+          
           const port = process.env.PORT || 3060;
-
+          
           // 確保 API 正常運行
           app.get("/", (req, res) => {
             res.send("Inside the server - Now using DynamoDB!");
           });
-
-          // 確保可以讀取與寫入 DynamoDB
+          
+          // 讀取 DynamoDB 中的禮物數據
           app.get("/api/gifts", async (req, res) => {
             try {
-              const gifts = await db.getGifts();
+              const gifts = await getGifts();
               res.json(gifts);
             } catch (error) {
               res.status(500).json({ error: error.message });
             }
           });
-
+          
+          // 新增禮物到 DynamoDB
           app.post("/api/gifts", async (req, res) => {
             try {
               const newGift = req.body;
-              await db.addGift(newGift);
+              await addGift(newGift);
               res.json({ message: "Gift added!", gift: newGift });
             } catch (error) {
               res.status(500).json({ error: error.message });
             }
           });
-
+          
           app.listen(port, "0.0.0.0", () => {
             console.log("✅ Server running on port", port);
             console.log("✅ Using AWS DynamoDB Table:", process.env.DYNAMODB_TABLE);
           });
           EOF
+
 
 
       - name: ✅ 確保 AWS DynamoDB Table 存在
