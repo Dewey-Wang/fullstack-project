@@ -29,6 +29,11 @@ jobs:
           npm uninstall aws-sdk
           npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb dotenv
           cd ..
+      - name: 📦 安裝 `uuid`
+        run: |
+          cd giftlink-backend
+          npm install uuid
+
       - name: 🔧 更新 `util/import-mongo/.env`
         run: |
           cat <<EOF > giftlink-backend/util/import-mongo/.env
@@ -87,7 +92,10 @@ jobs:
             },
           });
           
-          const db = DynamoDBDocumentClient.from(client);
+          const db = DynamoDBDocumentClient.from(client, {
+            marshallOptions: { convertEmptyValues: true, removeUndefinedValues: true },
+            unmarshallOptions: { wrapNumbers: false },
+          });
           
           module.exports = { db };
           EOF
@@ -149,16 +157,18 @@ jobs:
           const jwt = require("jsonwebtoken");
           const { db } = require("../models/db");
           const { ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
+          const { v4: uuidv4 } = require("uuid");  // ✅ 新增 UUID 產生器
           
           const router = express.Router();
           const JWT_SECRET = process.env.JWT_SECRET;
           const TABLE_USERS = "giftapp-users";
           
-          // 🏠 註冊用戶
+          // 📌 註冊用戶
           router.post("/register", async (req, res) => {
             try {
               const { email, firstName, lastName, password } = req.body;
           
+              // 檢查 Email 是否已存在
               const existingUsers = await db.send(
                 new ScanCommand({
                   TableName: TABLE_USERS,
@@ -171,9 +181,10 @@ jobs:
                 return res.status(400).json({ error: "Email already exists" });
               }
           
+              // 加密密碼
               const salt = await bcryptjs.genSalt(10);
               const hashedPassword = await bcryptjs.hash(password, salt);
-              const userId = `USER-${Date.now()}`;
+              const userId = uuidv4();  // ✅ 使用 UUID 產生唯一 ID
           
               await db.send(
                 new PutCommand({
@@ -196,6 +207,8 @@ jobs:
               res.status(500).json({ error: "Internal Server Error" });
             }
           });
+
+
           
           // 🔑 用戶登入
           router.post("/login", async (req, res) => {
@@ -236,16 +249,40 @@ jobs:
           cat <<EOF > giftlink-backend/routes/giftRoutes.js
           const express = require("express");
           const { db } = require("../models/db");
-          const { ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
+          const { ScanCommand, PutCommand, GetCommand } = require("@aws-sdk/lib-dynamodb");
+          const { v4: uuidv4 } = require("uuid");  // ✅ 新增 UUID 產生器
           
           const router = express.Router();
           const TABLE_GIFTS = "giftapp-gifts";
           
-          // 📌 取得所有禮物
+          // 📌 取得所有禮物 (支持分頁)
           router.get("/", async (req, res) => {
             try {
-              const data = await db.send(new ScanCommand({ TableName: TABLE_GIFTS }));
-              res.json(data.Items || []);
+              let params = { TableName: TABLE_GIFTS };
+              if (req.query.lastKey) {
+                params.ExclusiveStartKey = JSON.parse(req.query.lastKey);
+              }
+          
+              const data = await db.send(new ScanCommand(params));
+          
+              res.json({
+                gifts: data.Items || [],
+                lastKey: data.LastEvaluatedKey ? JSON.stringify(data.LastEvaluatedKey) : null,
+              });
+            } catch (error) {
+              res.status(500).json({ error: error.message });
+            }
+          });
+          
+          // 📌 取得單一禮物
+          router.get("/:id", async (req, res) => {
+            try {
+              const data = await db.send(new GetCommand({ TableName: TABLE_GIFTS, Key: { id: req.params.id } }));
+          
+              if (!data.Item) {
+                return res.status(404).json({ error: "Gift not found" });
+              }
+              res.json(data.Item);
             } catch (error) {
               res.status(500).json({ error: error.message });
             }
@@ -255,7 +292,7 @@ jobs:
           router.post("/", async (req, res) => {
             try {
               const gift = {
-                id: `GIFT-${Date.now()}`,
+                id: uuidv4(),  // ✅ 使用 UUID 產生唯一 ID
                 ...req.body,
                 createdAt: new Date().toISOString(),
               };
@@ -293,12 +330,15 @@ jobs:
                 expressionAttributeNames["#name"] = "name";
               }
           
-              const params = {
+              let params = {
                 TableName: TABLE_GIFTS,
-                FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
                 ExpressionAttributeValues: expressionAttributeValues,
                 ExpressionAttributeNames: expressionAttributeNames,
               };
+          
+              if (filterExpressions.length > 0) {
+                params.FilterExpression = filterExpressions.join(" AND ");
+              }
           
               const gifts = await db.send(new ScanCommand(params));
               res.json(gifts.Items || []);
