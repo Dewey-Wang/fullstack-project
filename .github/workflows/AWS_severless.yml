@@ -111,211 +111,51 @@ jobs:
           AWS_REGION=${{ secrets.AWS_REGION }}
           JWT_SECRET=mysecret
           EOF
-          
+     
       - name: 🔧 更新 `app.js` 來支援 DynamoDB
         run: |
           cat <<EOF > giftlink-backend/app.js
-          /*jshint esversion: 8 */
-          require("dotenv").config();
           const express = require("express");
           const cors = require("cors");
-          const pinoLogger = require("./logger");
-          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-          const { DynamoDBDocumentClient, ScanCommand, PutCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
-          const bcryptjs = require("bcryptjs");
-          const jwt = require("jsonwebtoken");
+          const { getGifts, addGift } = require("./models/db");
           
           const app = express();
           app.use(cors());
           app.use(express.json());
-          app.use(require("pino-http")({ logger: pinoLogger }));
           
           const port = process.env.PORT || 3060;
-          const TABLE_USERS = "giftapp-users";
-          const TABLE_GIFTS = "giftapp-gifts";
           
-          const client = new DynamoDBClient({ region: process.env.AWS_REGION });
-          const db = DynamoDBDocumentClient.from(client);
-          
-          // ===============================
-          // 🏠 API Health Check
-          // ===============================
+          // 確保 API 正常運行
           app.get("/", (req, res) => {
             res.send("Inside the server - Now using DynamoDB!");
           });
           
-          // ===============================
-          // 🔒 Authentication Routes
-          // ===============================
-          // 📌 User Registration
-          app.post("/api/auth/register", async (req, res) => {
-            try {
-              const { email, firstName, lastName, password } = req.body;
-
-              // 查找用戶是否已存在
-              const existingUsers = await db.send(
-                new ScanCommand({
-                  TableName: TABLE_USERS,
-                  FilterExpression: "email = :email",
-                  ExpressionAttributeValues: { ":email": email },
-                })
-              );
-
-              if (existingUsers.Items.length > 0) {
-                return res.status(400).json({ error: "Email already exists" });
-              }
-
-              // 密碼加密
-              const salt = await bcryptjs.genSalt(10);
-              const hashedPassword = await bcryptjs.hash(password, salt);
-              const userId = `USER-${Date.now()}`;
-
-              await db.send(
-                new PutCommand({
-                  TableName: TABLE_USERS,
-                  Item: {
-                    id: userId,
-                    email,
-                    firstName,
-                    lastName,
-                    password: hashedPassword,
-                    createdAt: new Date().toISOString(),
-                  },
-                })
-              );
-
-              const authtoken = jwt.sign({ userId }, process.env.JWT_SECRET);
-              res.json({ authtoken, email });
-            } catch (e) {
-              console.error(e);
-              res.status(500).json({ error: "Internal Server Error" });
-            }
-          });
-
-
-          // 📌 User Login
-          app.post("/api/auth/login", async (req, res) => {
-            try {
-              const { email, password } = req.body;
-          
-              // 用 `ScanCommand` 找 email
-              const users = await db.send(
-                new ScanCommand({
-                  TableName: TABLE_USERS,
-                  FilterExpression: "email = :email",
-                  ExpressionAttributeValues: { ":email": email },
-                })
-              );
-          
-              if (users.Items.length === 0) {
-                return res.status(404).json({ error: "User not found" });
-              }
-          
-              const theUser = users.Items[0];
-              const match = await bcryptjs.compare(password, theUser.password);
-          
-              if (!match) {
-                return res.status(401).json({ error: "Wrong password" });
-              }
-          
-              const authtoken = jwt.sign({ userId: theUser.id }, process.env.JWT_SECRET);
-              res.json({ authtoken, userName: theUser.firstName, userEmail: theUser.email });
-            } catch (e) {
-              console.error(e);
-              res.status(500).json({ error: "Internal Server Error" });
-            }
-          });
-
-          
-          // ===============================
-          // 🎁 Gift Routes
-          // ===============================
-          // 📌 Get all gifts
+          // 讀取 DynamoDB 中的禮物數據
           app.get("/api/gifts", async (req, res) => {
             try {
-              const data = await db.send(new ScanCommand({ TableName: TABLE_GIFTS }));
-              res.json(data.Items || []);
+              const gifts = await getGifts();
+              res.json(gifts);
             } catch (error) {
               res.status(500).json({ error: error.message });
             }
           });
           
-          // 📌 Add new gift
+          // 新增禮物到 DynamoDB
           app.post("/api/gifts", async (req, res) => {
             try {
-              const gift = {
-                id: `GIFT-${Date.now()}`,
-                ...req.body,
-                createdAt: new Date().toISOString(),
-              };
-          
-              await db.send(new PutCommand({ TableName: TABLE_GIFTS, Item: gift }));
-              res.json({ message: "Gift added!", gift });
+              const newGift = req.body;
+              await addGift(newGift);
+              res.json({ message: "Gift added!", gift: newGift });
             } catch (error) {
               res.status(500).json({ error: error.message });
             }
-          });
-          
-          // ===============================
-          // 🔎 Search Routes
-          // ===============================
-          app.get("/api/search", async (req, res) => {
-            try {
-              let filterExpressions = [];
-              let expressionAttributeValues = {};
-              let expressionAttributeNames = {};
-          
-              if (req.query.name) {
-                filterExpressions.push("contains(#name, :name)");
-                expressionAttributeValues[":name"] = req.query.name;
-                expressionAttributeNames["#name"] = "name";
-              }
-          
-              if (req.query.category) {
-                filterExpressions.push("category = :category");
-                expressionAttributeValues[":category"] = req.query.category;
-              }
-          
-              if (req.query.condition) {
-                filterExpressions.push("condition = :condition");
-                expressionAttributeValues[":condition"] = req.query.condition;
-              }
-          
-              if (req.query.age_years) {
-                filterExpressions.push("age_years <= :age");
-                expressionAttributeValues[":age"] = parseInt(req.query.age_years);
-              }
-          
-              const params = {
-                TableName: TABLE_GIFTS,
-                FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
-                ExpressionAttributeValues: expressionAttributeValues,
-                ExpressionAttributeNames: expressionAttributeNames,
-              };
-          
-              const gifts = await db.send(new ScanCommand(params));
-              res.json(gifts.Items || []);
-            } catch (e) {
-              res.status(500).json({ error: e.message });
-            }
-          });
-
-          
-          // ===============================
-          // ⚠️ Error Handling
-          // ===============================
-          app.use((err, req, res, next) => {
-            console.error(err);
-            res.status(500).send("Internal Server Error");
           });
           
           app.listen(port, "0.0.0.0", () => {
-            console.log(`✅ Server running on port ${port}`);
-            console.log(`✅ Using AWS DynamoDB Tables: Users: ${TABLE_USERS}, Gifts: ${TABLE_GIFTS}`);
+            console.log("✅ Server running on port", port);
+            console.log("✅ Using AWS DynamoDB Table:", process.env.DYNAMODB_TABLE);
           });
-
           EOF
-
       - name: ✅ 確保 AWS DynamoDB Table 存在
         run: |
           TABLE_NAME="giftapp-data"
@@ -332,54 +172,6 @@ jobs:
           else
             echo "✅ DynamoDB Table $TABLE_NAME 已存在"
           fi
-
-      - name: ✅ 確保 AWS DynamoDB Tables (giftapp-users & giftapp-gifts) 存在
-        run: |
-          for TABLE_NAME in "giftapp-users" "giftapp-gifts"; do
-            EXISTING_TABLE=$(aws dynamodb list-tables --query "TableNames" --output json | grep -w "$TABLE_NAME" || echo "")
-            
-            if [ -z "$EXISTING_TABLE" ]; then
-              echo "🔄 創建 DynamoDB Table: $TABLE_NAME"
-              if [ "$TABLE_NAME" == "giftapp-users" ]; then
-                aws dynamodb create-table \
-                  --table-name $TABLE_NAME \
-                  --attribute-definitions AttributeName=id,AttributeType=S \
-                  --key-schema AttributeName=id,KeyType=HASH \
-                  --billing-mode PAY_PER_REQUEST \
-                  --region ${{ secrets.AWS_REGION }}
-                echo "✅ DynamoDB Table $TABLE_NAME (Users) 創建成功！"
-              elif [ "$TABLE_NAME" == "giftapp-gifts" ]; then
-                aws dynamodb create-table \
-                  --table-name $TABLE_NAME \
-                  --attribute-definitions AttributeName=id,AttributeType=S \
-                  --key-schema AttributeName=id,KeyType=HASH \
-                  --billing-mode PAY_PER_REQUEST \
-                  --region ${{ secrets.AWS_REGION }}
-                echo "✅ DynamoDB Table $TABLE_NAME (Gifts) 創建成功！"
-              fi
-            else
-              echo "✅ DynamoDB Table $TABLE_NAME 已存在"
-            fi
-          done
-
-      - name: ✅ 確保 `giftapp-users` 表的 `email-index` 存在
-        run: |
-          TABLE_NAME="giftapp-users"
-          INDEX_NAME="email-index"
-          EXISTING_INDEX=$(aws dynamodb describe-table --table-name "$TABLE_NAME" --query "Table.GlobalSecondaryIndexes[?IndexName=='$INDEX_NAME'].IndexName" --output text --region ${{ secrets.AWS_REGION }} || echo "")
-
-          if [ -z "$EXISTING_INDEX" ]; then
-            echo "🔄 創建 GSI: $INDEX_NAME"
-            aws dynamodb update-table \
-              --table-name "$TABLE_NAME" \
-              --attribute-definitions AttributeName=email,AttributeType=S \
-              --global-secondary-index-updates '[{"Create": {"IndexName": "'$INDEX_NAME'", "KeySchema": [{"AttributeName": "email", "KeyType": "HASH"}], "ProvisionedThroughput": {"ReadCapacityUnits": 5, "WriteCapacityUnits": 5}, "Projection": {"ProjectionType": "ALL"}}}]' \
-              --region ${{ secrets.AWS_REGION }}
-            echo "✅ GSI 創建成功！"
-          else
-            echo "✅ GSI $INDEX_NAME 已存在"
-          fi
-
       - name: 🔄 確保環境變數載入
         run: |
           set -a  # 讓 `export` 變數自動適用
@@ -393,8 +185,7 @@ jobs:
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS --password-stdin \
           ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com  
-
-
+          
       - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
         run: |
           docker buildx create --use
@@ -406,12 +197,34 @@ jobs:
       - name: ⏹️ 檢查並更新或創建 giftapp-backend 的 App Runner 服務
         run: |
           SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
-
-          if [ "$SERVICE_ARN" == "None" ] || [ -z "$SERVICE_ARN" ]; then
-              echo "🔄 創建 App Runner 服務..."
-              aws apprunner create-service \
-                --service-name giftapp-backend \
-                --source-configuration "{
+          
+          if [ -z "$SERVICE_ARN" ]; then
+            STATUS="NOT_FOUND"
+          else
+            STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+          fi
+          echo "🔍 App Runner 目前狀態: $STATUS"
+          
+          # 如果狀態為 OPERATION_IN_PROGRESS，就等到它完成
+          if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
+            echo "⚠️ `App Runner` 正在運行，等待完成..."
+            while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
+              sleep 10
+              STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+            done
+          fi
+          if [ "$STATUS" != "RUNNING" ]; then
+              echo "🛑 停止 App Runner 服務..."
+              aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
+          fi
+          STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+          
+          # 如果 App Runner 服務存在，則更新它
+          if [ "$STATUS" == "RUNNING" ]; then
+            echo "🔄 更新 App Runner 服務..."
+            aws apprunner update-service \
+              --service-arn "$SERVICE_ARN" \
+              --source-configuration "{
                 \"ImageRepository\": {
                   \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
                   \"ImageRepositoryType\": \"ECR\",
@@ -430,11 +243,13 @@ jobs:
                 }
               }" \
               --region ${{ secrets.AWS_REGION }}
+          
+          # 如果 App Runner 服務 **不存在或已刪除**，則創建新的
           else
-              echo "🔄 更新 App Runner 服務..."
-              aws apprunner update-service \
-                --service-arn "$SERVICE_ARN" \
-                --source-configuration "{
+            echo "🚀 創建新的 App Runner 服務..."
+            aws apprunner create-service \
+              --service-name giftapp-backend \
+              --source-configuration "{
                 \"ImageRepository\": {
                   \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
                   \"ImageRepositoryType\": \"ECR\",
@@ -454,34 +269,30 @@ jobs:
               }" \
               --region ${{ secrets.AWS_REGION }}
           fi
-
+          
       - name: 🔧 更新 giftlink-frontend/src/config.js
         run: |
           BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
-
+          
           if [ -z "$BACKEND_URL" ] || [ "$BACKEND_URL" == "None" ]; then
               echo "❌ 無法取得 Backend URL，部署中止"
               exit 1
           fi
-
-          # **確保 `backendUrl` 使用 HTTPS**
-          BACKEND_URL="https://$BACKEND_URL"
-          echo "🔍 取得的 Backend URL: $BACKEND_URL"
-          echo "REACT_APP_BACKEND_URL=$BACKEND_URL" > giftlink-frontend/.env
+          echo "🔍 取得的 Backend URL: https://$BACKEND_URL/"
+          echo "REACT_APP_BACKEND_URL=https://$BACKEND_URL/" > giftlink-frontend/.env
           cat giftlink-frontend/.env  # 確保內容更新
-
+          
           cat <<EOF > giftlink-frontend/src/config.js
           const config = {
-            backendUrl: "$BACKEND_URL",
+            backendUrl: "https://$BACKEND_URL/",
           };
           console.log("🔍 backendUrl in config.js:", config.backendUrl);
           export { config as urlConfig };
           EOF
           cat giftlink-frontend/src/config.js  # 確保內容正確
 
-          echo "✅ Backend URL: $BACKEND_URL"
-          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
-
+          echo "✅ Backend URL: https://$BACKEND_URL"
+          echo "BACKEND_URL=https://$BACKEND_URL" >> $GITHUB_ENV
 
       - name: 📦 安裝 Express 和 CORS in giftwebsite
         run: |
@@ -505,17 +316,12 @@ jobs:
 
           const app = express();
           const PORT = 9000;
-          const BACKEND_URL = process.env.BACKEND_URL;
-
-          if (!BACKEND_URL.startsWith("https://")) {
-            console.warn("⚠️ BACKEND_URL 不是 HTTPS，可能導致 Mixed Content 問題");
-          }
+          const BACKEND_URL = ${BACKEND_URL};
 
           // 代理 API 請求到 `giftlink-backend`
           app.use("/api", createProxyMiddleware({
             target: BACKEND_URL,
-            changeOrigin: true,
-            secure: true, // 強制 HTTPS
+            changeOrigin: true
           }));
 
           // 提供 React 靜態檔案
@@ -532,7 +338,6 @@ jobs:
             console.log(\`✅ Proxying API requests to: \${BACKEND_URL}\`);
           });
           EOF
-
 
 
       - name: 🛠️ 建立 `giftwebsite/Dockerfile`
