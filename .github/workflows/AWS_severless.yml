@@ -46,29 +46,29 @@ jobs:
           const fs = require("fs");
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
-
+          
           const TABLE_NAME = process.env.DYNAMODB_TABLE;
           if (!TABLE_NAME) {
               console.error("❌ DYNAMODB_TABLE 未設置，請確認 .env");
               process.exit(1);
           }
-
+          
           const client = new DynamoDBClient({ region: process.env.AWS_REGION });
           const dynamoDB = DynamoDBDocumentClient.from(client);
-
+          
           async function loadData() {
-              console.log("📥 讀取 gifts.json...");
+              console.log("📥 讀取 `gifts.json`...");
               const giftsFilePath = "giftlink-backend/util/import-mongo/gifts.json";
               const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
-
+          
               console.log("🚀 開始寫入 DynamoDB...");
               for (const gift of giftsData) {
                   await dynamoDB.send(new PutCommand({ TableName: TABLE_NAME, Item: gift }));
-                  console.log(\✅ 已寫入: \${gift.name}\);
+                  console.log(`✅ 已寫入: ${gift.name}`);
               }
-              console.log("✅ gifts.json 數據已成功導入 DynamoDB！");
+              console.log("✅ `gifts.json` 數據已成功導入 DynamoDB！");
           }
-
+          
           loadData().catch(console.error);
           EOF
 
