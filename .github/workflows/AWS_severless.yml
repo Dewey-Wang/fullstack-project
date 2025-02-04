@@ -272,7 +272,7 @@ jobs:
                 }
               },
               "AuthenticationConfiguration": {
-                "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRRole"
+                "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
               }
             }' \
             --region us-east-1
