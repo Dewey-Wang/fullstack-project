@@ -115,47 +115,205 @@ jobs:
       - name: 🔧 更新 `app.js` 來支援 DynamoDB
         run: |
           cat <<EOF > giftlink-backend/app.js
+          /*jshint esversion: 8 */
+          require("dotenv").config();
           const express = require("express");
           const cors = require("cors");
-          const { getGifts, addGift } = require("./models/db");
+          const pinoLogger = require("./logger");
+          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
+          const { DynamoDBDocumentClient, ScanCommand, PutCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
+          const bcryptjs = require("bcryptjs");
+          const jwt = require("jsonwebtoken");
           
           const app = express();
           app.use(cors());
           app.use(express.json());
+          app.use(require("pino-http")({ logger: pinoLogger }));
           
           const port = process.env.PORT || 3060;
+          const TABLE_USERS = "giftapp-users";
+          const TABLE_GIFTS = "giftapp-gifts";
           
-          // 確保 API 正常運行
+          const client = new DynamoDBClient({ region: process.env.AWS_REGION });
+          const db = DynamoDBDocumentClient.from(client);
+          
+          // ===============================
+          // 🏠 API Health Check
+          // ===============================
           app.get("/", (req, res) => {
             res.send("Inside the server - Now using DynamoDB!");
           });
+
+                  // ===============================
+          // 🔒 Authentication Routes
+          // ===============================
+          // 📌 User Registration
+          app.post("/api/auth/register", async (req, res) => {
+            try {
+              const { email, firstName, lastName, password } = req.body;
+
+              // 查找用戶是否已存在
+              const existingUsers = await db.send(
+                new ScanCommand({
+                  TableName: TABLE_USERS,
+                  FilterExpression: "email = :email",
+                  ExpressionAttributeValues: { ":email": email },
+                })
+              );
+
+              if (existingUsers.Items.length > 0) {
+                return res.status(400).json({ error: "Email already exists" });
+              }
+
+              // 密碼加密
+              const salt = await bcryptjs.genSalt(10);
+              const hashedPassword = await bcryptjs.hash(password, salt);
+              const userId = `USER-${Date.now()}`;
+
+              await db.send(
+                new PutCommand({
+                  TableName: TABLE_USERS,
+                  Item: {
+                    id: userId,
+                    email,
+                    firstName,
+                    lastName,
+                    password: hashedPassword,
+                    createdAt: new Date().toISOString(),
+                  },
+                })
+              );
+                        const authtoken = jwt.sign({ userId }, process.env.JWT_SECRET);
+              res.json({ authtoken, email });
+            } catch (e) {
+              console.error(e);
+              res.status(500).json({ error: "Internal Server Error" });
+            }
+          });
+
+
+          // 📌 User Login
+          app.post("/api/auth/login", async (req, res) => {
+            try {
+              const { email, password } = req.body;
           
-          // 讀取 DynamoDB 中的禮物數據
+              // 用 `ScanCommand` 找 email
+              const users = await db.send(
+                new ScanCommand({
+                  TableName: TABLE_USERS,
+                  FilterExpression: "email = :email",
+                  ExpressionAttributeValues: { ":email": email },
+                })
+              );
+          
+              if (users.Items.length === 0) {
+                return res.status(404).json({ error: "User not found" });
+              }
+          
+              const theUser = users.Items[0];
+              const match = await bcryptjs.compare(password, theUser.password);
+                  if (!match) {
+                return res.status(401).json({ error: "Wrong password" });
+              }
+          
+              const authtoken = jwt.sign({ userId: theUser.id }, process.env.JWT_SECRET);
+              res.json({ authtoken, userName: theUser.firstName, userEmail: theUser.email });
+            } catch (e) {
+              console.error(e);
+              res.status(500).json({ error: "Internal Server Error" });
+            }
+          });
+
+          
+          // ===============================
+          // 🎁 Gift Routes
+          // ===============================
+          // 📌 Get all gifts
           app.get("/api/gifts", async (req, res) => {
             try {
-              const gifts = await getGifts();
-              res.json(gifts);
+              const data = await db.send(new ScanCommand({ TableName: TABLE_GIFTS }));
+              res.json(data.Items || []);
             } catch (error) {
               res.status(500).json({ error: error.message });
             }
           });
           
-          // 新增禮物到 DynamoDB
+          // 📌 Add new gift
           app.post("/api/gifts", async (req, res) => {
             try {
-              const newGift = req.body;
-              await addGift(newGift);
-              res.json({ message: "Gift added!", gift: newGift });
+              const gift = {
+                id: `GIFT-${Date.now()}`,
+                ...req.body,
+                createdAt: new Date().toISOString(),
+              };
+          
+              await db.send(new PutCommand({ TableName: TABLE_GIFTS, Item: gift }));
+              res.json({ message: "Gift added!", gift });
             } catch (error) {
               res.status(500).json({ error: error.message });
             }
+          });
+          
+          // ===============================
+          // 🔎 Search Routes
+          // ===============================
+          app.get("/api/search", async (req, res) => {
+            try {
+              let filterExpressions = [];
+              let expressionAttributeValues = {};
+              let expressionAttributeNames = {};
+          
+              if (req.query.name) {
+                filterExpressions.push("contains(#name, :name)");
+                expressionAttributeValues[":name"] = req.query.name;
+                expressionAttributeNames["#name"] = "name";
+              }
+          
+              if (req.query.category) {
+                filterExpressions.push("category = :category");
+                expressionAttributeValues[":category"] = req.query.category;
+              }
+          
+              if (req.query.condition) {
+                filterExpressions.push("condition = :condition");
+                expressionAttributeValues[":condition"] = req.query.condition;
+              }
+          
+              if (req.query.age_years) {
+                filterExpressions.push("age_years <= :age");
+                expressionAttributeValues[":age"] = parseInt(req.query.age_years);
+              }
+             
+              const params = {
+                TableName: TABLE_GIFTS,
+                FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
+                ExpressionAttributeValues: expressionAttributeValues,
+                ExpressionAttributeNames: expressionAttributeNames,
+              };
+          
+              const gifts = await db.send(new ScanCommand(params));
+              res.json(gifts.Items || []);
+            } catch (e) {
+              res.status(500).json({ error: e.message });
+            }
+          });
+
+          
+          // ===============================
+          // ⚠️ Error Handling
+          // ===============================
+          app.use((err, req, res, next) => {
+            console.error(err);
+            res.status(500).send("Internal Server Error");
           });
           
           app.listen(port, "0.0.0.0", () => {
-            console.log("✅ Server running on port", port);
-            console.log("✅ Using AWS DynamoDB Table:", process.env.DYNAMODB_TABLE);
+            console.log(`✅ Server running on port ${port}`);
+            console.log(`✅ Using AWS DynamoDB Tables: Users: ${TABLE_USERS}, Gifts: ${TABLE_GIFTS}`);
           });
+
           EOF
+          
       - name: ✅ 確保 AWS DynamoDB Table 存在
         run: |
           TABLE_NAME="giftapp-data"
