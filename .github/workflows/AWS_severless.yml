@@ -316,8 +316,8 @@ jobs:
           const { createProxyMiddleware } = require("http-proxy-middleware");
 
           const app = express();
-          const PORT = process.env.PORT || 9000;
-          const BACKEND_URL = process.env.BACKEND_URL || "https://your-backend.apprunner.aws/";
+          const PORT = 9000;
+          const BACKEND_URL = ${{ env.BACKEND_URL }};
 
           app.use(cors());
 
@@ -346,12 +346,20 @@ jobs:
         run: |
           cat <<EOF > giftwebsite/Dockerfile
           # 1️⃣ 建置 React 前端
-          FROM node:18-alpine AS build
-          WORKDIR /app
-          COPY package.json package-lock.json ./
-          RUN npm install
+          # Use Node.js LTS version
+          FROM node:14.17.0-slim
+          
+          # Set working directory
+          WORKDIR /usr/src/app
+          
+          # Copy package.json and package-lock.json files
+          COPY package*.json ./
+          
+          # Install dependencies
+          RUN npm install --production
+          
+          # Copy application code
           COPY . .
-          RUN npm run build
 
           # 2️⃣ 運行 Express 伺服器，代理 API
           FROM node:18-alpine
