@@ -23,58 +23,56 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 🔧 更新 util/import-mongo/.env
+      - name: 📦 安裝 AWS SDK v3 & dotenv
+        run: |
+          cd giftlink-backend
+          npm uninstall aws-sdk
+          npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb dotenv
+          cd ..
+      - name: 🔧 更新 `util/import-mongo/.env`
         run: |
           cat <<EOF > giftlink-backend/util/import-mongo/.env
           DYNAMODB_TABLE=giftapp-data
           DATASRC=gifts.json
           EOF
-      - name: 🔧 確保 .env 設置 DYNAMODB_TABLE
+      - name: 🔧 確保 `.env` 設置 `DYNAMODB_TABLE`
         run: |
           cat <<EOF > giftlink-backend/.env
           DYNAMODB_TABLE=giftapp-data
           JWT_SECRET=mysecret
           EOF
           
-      - name: 🔄 輸出 .env 來確認設定
+      - name: 🔄 輸出 `.env` 來確認設定
         run: cat giftlink-backend/.env
 
-      - name: 🔧 修正 index.js 確保 .env 正確載入
+      - name: 🔧 修正 `index.js` 確保 `.env` 正確載入
         run: |
           cat <<EOF > giftlink-backend/util/import-mongo/index.js
           require("dotenv").config({ path: "giftlink-backend/util/import-mongo/.env" });
           const fs = require("fs");
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
-          
           const TABLE_NAME = process.env.DYNAMODB_TABLE;
           if (!TABLE_NAME) {
               console.error("❌ DYNAMODB_TABLE 未設置，請確認 .env");
               process.exit(1);
           }
-          
           const client = new DynamoDBClient({ region: process.env.AWS_REGION });
           const dynamoDB = DynamoDBDocumentClient.from(client);
-          
           async function loadData() {
               console.log("📥 讀取 `gifts.json`...");
               const giftsFilePath = "giftlink-backend/util/import-mongo/gifts.json";
               const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
-          
               console.log("🚀 開始寫入 DynamoDB...");
               for (const gift of giftsData) {
                   await dynamoDB.send(new PutCommand({ TableName: TABLE_NAME, Item: gift }));
-                  console.log(`✅ 已寫入: ${gift.name}`);
+                  console.log(\`✅ 已寫入: \${gift.name}\`);
               }
               console.log("✅ `gifts.json` 數據已成功導入 DynamoDB！");
           }
-          
           loadData().catch(console.error);
           EOF
-
-
-
-      - name: 🔧 更新 models/db.js
+      - name: 🔧 更新 `models/db.js`
         run: |
           cat <<EOF > giftlink-backend/models/db.js
           require("dotenv").config();
@@ -106,18 +104,15 @@ jobs:
           
           module.exports = { getGifts, addGift };
           EOF
-
-
-      - name: 🔧 更新 .env，移除 MongoDB 並添加 DynamoDB
+      - name: 🔧 更新 `.env`，移除 MongoDB 並添加 DynamoDB
         run: |
           cat <<EOF > giftlink-backend/.env
           DYNAMODB_TABLE=giftapp-data
           AWS_REGION=${{ secrets.AWS_REGION }}
           JWT_SECRET=mysecret
           EOF
-
      
-      - name: 🔧 更新 app.js 來支援 DynamoDB
+      - name: 🔧 更新 `app.js` 來支援 DynamoDB
         run: |
           cat <<EOF > giftlink-backend/app.js
           const express = require("express");
@@ -161,19 +156,10 @@ jobs:
             console.log("✅ Using AWS DynamoDB Table:", process.env.DYNAMODB_TABLE);
           });
           EOF
-
-      - name: 📦 安裝 AWS SDK v3 & dotenv
-        run: |
-          cd giftlink-backend
-          npm uninstall aws-sdk
-          npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb dotenv
-          cd ..
-
       - name: ✅ 確保 AWS DynamoDB Table 存在
         run: |
           TABLE_NAME="giftapp-data"
           EXISTING_TABLE=$(aws dynamodb list-tables --query "TableNames" --output json | grep -w "$TABLE_NAME" || echo "")
-
           if [ -z "$EXISTING_TABLE" ]; then
             echo "🔄 創建 DynamoDB Table: $TABLE_NAME"
             aws dynamodb create-table \
@@ -188,14 +174,12 @@ jobs:
           fi
       - name: 🔄 確保環境變數載入
         run: |
-          set -a  # 讓 export 變數自動適用
+          set -a  # 讓 `export` 變數自動適用
           source giftlink-backend/util/import-mongo/.env
           set +a
-
-      - name: 🔄 透過 Node.js index.js 將 gifts.json 存入 DynamoDB
+      - name: 🔄 透過 Node.js `index.js` 將 `gifts.json` 存入 DynamoDB
         run: |
           node giftlink-backend/util/import-mongo/index.js
-
       - name: 🔐 登录 AWS ECR
         run: |
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
@@ -219,13 +203,11 @@ jobs:
           else
             STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
           fi
-
           echo "🔍 App Runner 目前狀態: $STATUS"
-
           
           # 如果狀態為 OPERATION_IN_PROGRESS，就等到它完成
           if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
-            echo "⚠️ App Runner 正在運行，等待完成..."
+            echo "⚠️ `App Runner` 正在運行，等待完成..."
             while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
               sleep 10
               STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
@@ -236,7 +218,6 @@ jobs:
               aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
           fi
           STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-
           
           # 如果 App Runner 服務存在，則更新它
           if [ "$STATUS" == "RUNNING" ]; then
