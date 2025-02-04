@@ -273,26 +273,30 @@ jobs:
       - name: 🔧 更新 giftlink-frontend/src/config.js
         run: |
           BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
-          
+
           if [ -z "$BACKEND_URL" ] || [ "$BACKEND_URL" == "None" ]; then
               echo "❌ 無法取得 Backend URL，部署中止"
               exit 1
           fi
-          echo "🔍 取得的 Backend URL: https://$BACKEND_URL/"
-          echo "REACT_APP_BACKEND_URL=https://$BACKEND_URL/" > giftlink-frontend/.env
+
+          # **確保 `backendUrl` 使用 HTTPS**
+          BACKEND_URL="https://$BACKEND_URL"
+          echo "🔍 取得的 Backend URL: $BACKEND_URL"
+          echo "REACT_APP_BACKEND_URL=$BACKEND_URL" > giftlink-frontend/.env
           cat giftlink-frontend/.env  # 確保內容更新
-          
+
           cat <<EOF > giftlink-frontend/src/config.js
           const config = {
-            backendUrl: "https://$BACKEND_URL/",
+            backendUrl: "$BACKEND_URL",
           };
           console.log("🔍 backendUrl in config.js:", config.backendUrl);
           export { config as urlConfig };
           EOF
           cat giftlink-frontend/src/config.js  # 確保內容正確
 
-          echo "✅ Backend URL: https://$BACKEND_URL"
-          echo "BACKEND_URL=https://$BACKEND_URL" >> $GITHUB_ENV
+          echo "✅ Backend URL: $BACKEND_URL"
+          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+
 
       - name: 📦 安裝 Express 和 CORS in giftwebsite
         run: |
@@ -316,12 +320,17 @@ jobs:
 
           const app = express();
           const PORT = 9000;
-          const BACKEND_URL = ${BACKEND_URL};
+          const BACKEND_URL = process.env.BACKEND_URL;
+
+          if (!BACKEND_URL.startsWith("https://")) {
+            console.warn("⚠️ BACKEND_URL 不是 HTTPS，可能導致 Mixed Content 問題");
+          }
 
           // 代理 API 請求到 `giftlink-backend`
           app.use("/api", createProxyMiddleware({
             target: BACKEND_URL,
-            changeOrigin: true
+            changeOrigin: true,
+            secure: true, // 強制 HTTPS
           }));
 
           // 提供 React 靜態檔案
@@ -338,6 +347,7 @@ jobs:
             console.log(\`✅ Proxying API requests to: \${BACKEND_URL}\`);
           });
           EOF
+
 
 
       - name: 🛠️ 建立 `giftwebsite/Dockerfile`
