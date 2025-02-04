@@ -367,7 +367,7 @@ jobs:
           TABLE_NAME="giftapp-users"
           INDEX_NAME="email-index"
           EXISTING_INDEX=$(aws dynamodb describe-table --table-name "$TABLE_NAME" --query "Table.GlobalSecondaryIndexes[?IndexName=='$INDEX_NAME'].IndexName" --output text --region ${{ secrets.AWS_REGION }} || echo "")
-      
+
           if [ -z "$EXISTING_INDEX" ]; then
             echo "🔄 創建 GSI: $INDEX_NAME"
             aws dynamodb update-table \
