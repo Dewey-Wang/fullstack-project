@@ -287,7 +287,12 @@ jobs:
           cat <<EOF > giftlink-frontend/.env
           REACT_APP_BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
           EOF
-          
+
+      - name: 🔍 查看 `.env` 檔案內容
+        run: |
+          echo "📂 內容如下："
+          cat giftlink-frontend/.env
+
       - name: 📦 安裝express and cors in giftwebsite
         run: |
           cd ./giftwebsite
@@ -304,7 +309,7 @@ jobs:
             
       - name: 🚀 部署 giftwebsite 到 AWS App Runner
         run: |
-          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn | [0]" --output text --region ${{ secrets.AWS_REGION }})
           echo "🔍 取得的 SERVICE_ARN: $SERVICE_ARN"
 
           if [ "$SERVICE_ARN" == "None" ] || [ -z "$SERVICE_ARN" ]; then
