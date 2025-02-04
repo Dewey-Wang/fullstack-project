@@ -302,7 +302,16 @@ jobs:
           echo "REACT_APP_BACKEND_URL=https://$BACKEND_URL/" > giftlink-frontend/.env
           cat giftlink-frontend/.env  # 確保內容更新
 
-      
+      - name: 🔧 更新 `giftlink-frontend/src/config.js`
+        run: |
+          cat <<EOF > giftlink-frontend/src/config.js
+          const config = {
+            backendUrl: BACKEND_URL,
+          };
+          
+          console.log(`backendUrl in config.js: ${config.backendUrl}`)
+          export {config as urlConfig}
+          EOF
       - name: 🔍 查看 `.env` 檔案內容 (完整顯示)
         run: |
           cd giftlink-frontend
