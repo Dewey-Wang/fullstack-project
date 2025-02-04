@@ -50,27 +50,54 @@ jobs:
           cat <<EOF > giftlink-backend/util/import-mongo/index.js
           require("dotenv").config({ path: "giftlink-backend/util/import-mongo/.env" });
           const fs = require("fs");
+          const bcryptjs = require("bcryptjs");
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
-          const TABLE_NAME = process.env.DYNAMODB_TABLE;
-          if (!TABLE_NAME) {
-              console.error("❌ DYNAMODB_TABLE 未設置，請確認 .env");
-              process.exit(1);
-          }
+          
           const client = new DynamoDBClient({ region: process.env.AWS_REGION });
           const dynamoDB = DynamoDBDocumentClient.from(client);
-          async function loadData() {
+          
+          // ✅ `giftapp-gifts` 預載入
+          async function loadGifts() {
+              const TABLE_GIFTS = "giftapp-gifts";
               console.log("📥 讀取 `gifts.json`...");
               const giftsFilePath = "giftlink-backend/util/import-mongo/gifts.json";
               const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
               console.log("🚀 開始寫入 DynamoDB...");
               for (const gift of giftsData) {
-                  await dynamoDB.send(new PutCommand({ TableName: TABLE_NAME, Item: gift }));
-                  console.log(\`✅ 已寫入: \${gift.name}\`);
+                  await dynamoDB.send(new PutCommand({ TableName: TABLE_GIFTS, Item: gift }));
+                  console.log(`✅ 已寫入: ${gift.name}`);
               }
               console.log("✅ `gifts.json` 數據已成功導入 DynamoDB！");
           }
-          loadData().catch(console.error);
+          
+          // ✅ `giftapp-users` 預載入
+          async function loadUsers() {
+              const TABLE_USERS = "giftapp-users";
+              console.log("📥 新增測試用戶...");
+              
+              const salt = await bcryptjs.genSalt(10);
+              const hashedPassword = await bcryptjs.hash("password123", salt);
+              
+              const testUser = {
+                  id: `USER-${Date.now()}`,
+                  email: "testuser@example.com",
+                  firstName: "Test",
+                  lastName: "User",
+                  password: hashedPassword,
+                  createdAt: new Date().toISOString(),
+              };
+          
+              await dynamoDB.send(new PutCommand({ TableName: TABLE_USERS, Item: testUser }));
+              console.log("✅ 測試用戶已建立: testuser@example.com / password123");
+          }
+          
+          async function main() {
+              await loadGifts();
+              await loadUsers();
+          }
+          
+          main().catch(console.error);
           EOF
       - name: 🔧 更新 `models/db.js`
         run: |
@@ -151,26 +178,25 @@ jobs:
           app.post("/api/auth/register", async (req, res) => {
             try {
               const { email, firstName, lastName, password } = req.body;
-          
-              // 查詢 DynamoDB，確認 Email 是否存在
-              const existingUser = await db.send(
-                new QueryCommand({
+
+              // 查找用戶是否已存在
+              const existingUsers = await db.send(
+                new ScanCommand({
                   TableName: TABLE_USERS,
-                  IndexName: "email-index",
-                  KeyConditionExpression: "email = :email",
+                  FilterExpression: "email = :email",
                   ExpressionAttributeValues: { ":email": email },
                 })
               );
-          
-              if (existingUser.Items.length > 0) {
+
+              if (existingUsers.Items.length > 0) {
                 return res.status(400).json({ error: "Email already exists" });
               }
-          
-              // Hash 密碼並存入 DynamoDB
+
+              // 密碼加密
               const salt = await bcryptjs.genSalt(10);
               const hashedPassword = await bcryptjs.hash(password, salt);
               const userId = `USER-${Date.now()}`;
-          
+
               await db.send(
                 new PutCommand({
                   TableName: TABLE_USERS,
@@ -184,7 +210,7 @@ jobs:
                   },
                 })
               );
-          
+
               const authtoken = jwt.sign({ userId }, process.env.JWT_SECRET);
               res.json({ authtoken, email });
             } catch (e) {
@@ -192,26 +218,27 @@ jobs:
               res.status(500).json({ error: "Internal Server Error" });
             }
           });
-          
+
+
           // 📌 User Login
           app.post("/api/auth/login", async (req, res) => {
             try {
               const { email, password } = req.body;
           
-              const user = await db.send(
-                new QueryCommand({
+              // 用 `ScanCommand` 找 email
+              const users = await db.send(
+                new ScanCommand({
                   TableName: TABLE_USERS,
-                  IndexName: "email-index",
-                  KeyConditionExpression: "email = :email",
+                  FilterExpression: "email = :email",
                   ExpressionAttributeValues: { ":email": email },
                 })
               );
           
-              if (user.Items.length === 0) {
+              if (users.Items.length === 0) {
                 return res.status(404).json({ error: "User not found" });
               }
           
-              const theUser = user.Items[0];
+              const theUser = users.Items[0];
               const match = await bcryptjs.compare(password, theUser.password);
           
               if (!match) {
@@ -225,6 +252,7 @@ jobs:
               res.status(500).json({ error: "Internal Server Error" });
             }
           });
+
           
           // ===============================
           // 🎁 Gift Routes
@@ -260,23 +288,36 @@ jobs:
           // ===============================
           app.get("/api/search", async (req, res) => {
             try {
-              let filterExpression = [];
+              let filterExpressions = [];
               let expressionAttributeValues = {};
+              let expressionAttributeNames = {};
           
               if (req.query.name) {
-                filterExpression.push("contains(#name, :name)");
+                filterExpressions.push("contains(#name, :name)");
                 expressionAttributeValues[":name"] = req.query.name;
+                expressionAttributeNames["#name"] = "name";
               }
+          
               if (req.query.category) {
-                filterExpression.push("category = :category");
+                filterExpressions.push("category = :category");
                 expressionAttributeValues[":category"] = req.query.category;
+              }
+          
+              if (req.query.condition) {
+                filterExpressions.push("condition = :condition");
+                expressionAttributeValues[":condition"] = req.query.condition;
+              }
+          
+              if (req.query.age_years) {
+                filterExpressions.push("age_years <= :age");
+                expressionAttributeValues[":age"] = parseInt(req.query.age_years);
               }
           
               const params = {
                 TableName: TABLE_GIFTS,
-                FilterExpression: filterExpression.length > 0 ? filterExpression.join(" AND ") : undefined,
+                FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
                 ExpressionAttributeValues: expressionAttributeValues,
-                ExpressionAttributeNames: { "#name": "name" },
+                ExpressionAttributeNames: expressionAttributeNames,
               };
           
               const gifts = await db.send(new ScanCommand(params));
@@ -285,6 +326,7 @@ jobs:
               res.status(500).json({ error: e.message });
             }
           });
+
           
           // ===============================
           // ⚠️ Error Handling
@@ -347,6 +389,23 @@ jobs:
             fi
           done
 
+      - name: ✅ 確保 `giftapp-users` 表的 `email-index` 存在
+        run: |
+          TABLE_NAME="giftapp-users"
+          INDEX_NAME="email-index"
+          EXISTING_INDEX=$(aws dynamodb describe-table --table-name "$TABLE_NAME" --query "Table.GlobalSecondaryIndexes[?IndexName=='$INDEX_NAME'].IndexName" --output text --region ${{ secrets.AWS_REGION }} || echo "")
+      
+          if [ -z "$EXISTING_INDEX" ]; then
+            echo "🔄 創建 GSI: $INDEX_NAME"
+            aws dynamodb update-table \
+              --table-name "$TABLE_NAME" \
+              --attribute-definitions AttributeName=email,AttributeType=S \
+              --global-secondary-index-updates '[{"Create": {"IndexName": "'$INDEX_NAME'", "KeySchema": [{"AttributeName": "email", "KeyType": "HASH"}], "ProvisionedThroughput": {"ReadCapacityUnits": 5, "WriteCapacityUnits": 5}, "Projection": {"ProjectionType": "ALL"}}}]' \
+              --region ${{ secrets.AWS_REGION }}
+            echo "✅ GSI 創建成功！"
+          else
+            echo "✅ GSI $INDEX_NAME 已存在"
+          fi
 
       - name: 🔄 確保環境變數載入
         run: |
