@@ -284,15 +284,21 @@ jobs:
           
       - name: 🔧 更新 `giftlink-frontend/.env`
         run: |
-          cat <<EOF > giftlink-frontend/.env
-          REACT_APP_BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
-          EOF
+          BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
+          
+          if [ -z "$BACKEND_URL" ] || [ "$BACKEND_URL" == "None" ]; then
+              echo "❌ 無法取得 Backend URL，部署中止"
+              exit 1
+          fi
+          
+          echo "REACT_APP_BACKEND_URL=https://$BACKEND_URL" > giftlink-frontend/.env
+
+
       
       - name: 🔍 查看 `.env` 檔案內容
         run: |
           echo "📂 內容如下："
           cat giftlink-frontend/.env
-          BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
           echo "✅ BACKEND 可在這裡訪問: https://$BACKEND_URL"
 
       - name: 📦 安裝express and cors in giftwebsite
@@ -304,6 +310,7 @@ jobs:
       - name: 📦 安裝所有必要的 packages in giftlink-frontend
         run: |
           cd ./giftlink-frontend
+          cat .env
           npm install
           npm run build
           cd ..
@@ -351,13 +358,13 @@ jobs:
           fi
           
           # 取得 App Runner 服務的 URL
-          GIFTWEBSITE_URL= $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
+          GIFTWEBSITE_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
 
           if [ -z "$GIFTWEBSITE_URL" ] || [ "$GIFTWEBSITE_URL" == "None" ]; then
               echo "❌ App Runner 部署失敗"
               exit 1
           fi
           
-          echo "✅ GiftWebsite 可在這裡訪問: https://$$GIFTWEBSITE_URL"
+          echo "✅ GiftWebsite 可在這裡訪問: https://$GIFTWEBSITE_URL"
           echo "GIFTWEBSITE_URL=$GIFTWEBSITE_URL" >> $GITHUB_ENV
 
