@@ -23,27 +23,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # **🔴 确保 `App Runner` 不会卡住**
-      - name: ⏹️ 停止已有的 App Runner 服務 (避免 OPERATION_IN_PROGRESS)
-        run: |
-          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
-          
-          if [ ! -z "$SERVICE_ARN" ]; then
-            STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-            
-            if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
-              echo "⚠️ `App Runner` 正在運行，等待完成..."
-              while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
-                STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-              done
-            fi
-            
-            if [ "$STATUS" != "DELETED" ]; then
-              echo "🛑 停止 App Runner 服務..."
-              aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
-            fi
-          fi
-
       - name: 📦 安裝 AWS SDK v3 & dotenv
         run: |
           cd giftlink-backend
@@ -250,32 +229,163 @@ jobs:
           docker buildx build --platform linux/amd64,linux/arm64 \
             -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest \
             --push ./giftlink-backend
-          aws ecr batch-get-image --repository-name giftapp-backend --image-ids imageTag=latest --query 'images[].architecture'
 
-
-      - name: 🚀 創建或更新 App Runner 服務
+      - name: ⏹️ 檢查並更新或創建 App Runner 服務
         run: |
-          aws apprunner create-service \
-            --service-name giftapp-backend \
-            --source-configuration '{
-              "ImageRepository": {
-                "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftapp-backend:latest",
-                "ImageRepositoryType": "ECR",
-                "ImageConfiguration": {
-                  "Port": "3060",
-                  "RuntimeEnvironmentVariables": {
-                    "DYNAMODB_TABLE": "giftapp-data",
-                    "AWS_REGION": "${{ secrets.AWS_REGION }}",
-                    "AWS_ACCESS_KEY_ID":"${{ secrets.AWS_ACCESS_KEY_ID }}",
-                    "AWS_SECRET_ACCESS_KEY":"${{ secrets.AWS_SECRET_ACCESS_KEY }}"
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+          
+          if [ -z "$SERVICE_ARN" ]; then
+            STATUS="NOT_FOUND"
+          else
+            STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+          fi
+
+          echo "🔍 App Runner 目前狀態: $STATUS"
+
+          
+          # 如果狀態為 OPERATION_IN_PROGRESS，就等到它完成
+          if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
+            echo "⚠️ `App Runner` 正在運行，等待完成..."
+            while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
+              sleep 10
+              STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+            done
+          fi
+          if [ "$STATUS" != "RUNNING" ]; then
+              echo "🛑 停止 App Runner 服務..."
+              aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
+            fi
+          fi
+          STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
+
+          
+          # 如果 App Runner 服務存在，則更新它
+          if [ "$STATUS" == "RUNNING" ]; then
+            echo "🔄 更新 App Runner 服務..."
+            aws apprunner update-service \
+              --service-arn "$SERVICE_ARN" \
+              --source-configuration "{
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
+                  \"ImageRepositoryType\": \"ECR\",
+                  \"ImageConfiguration\": {
+                    \"Port\": \"3060\",
+                    \"RuntimeEnvironmentVariables\": {
+                      \"DYNAMODB_TABLE\": \"giftapp-data\",
+                      \"AWS_REGION\": \"${{ secrets.AWS_REGION }}\",
+                      \"AWS_ACCESS_KEY_ID\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\",
+                      \"AWS_SECRET_ACCESS_KEY\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\"
+                    }
                   }
+                },
+                \"AuthenticationConfiguration\": {
+                  \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
                 }
-              },
-              "AuthenticationConfiguration": {
-                "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
-              }
-            }' \
-            --region us-east-1
+              }" \
+              --region ${{ secrets.AWS_REGION }}
+          
+          # 如果 App Runner 服務 **不存在或已刪除**，則創建新的
+          else
+            echo "🚀 創建新的 App Runner 服務..."
+            aws apprunner create-service \
+              --service-name giftapp-backend \
+              --source-configuration "{
+                \"ImageRepository\": {
+                  \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
+                  \"ImageRepositoryType\": \"ECR\",
+                  \"ImageConfiguration\": {
+                    \"Port\": \"3060\",
+                    \"RuntimeEnvironmentVariables\": {
+                      \"DYNAMODB_TABLE\": \"giftapp-data\",
+                      \"AWS_REGION\": \"${{ secrets.AWS_REGION }}\",
+                      \"AWS_ACCESS_KEY_ID\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\",
+                      \"AWS_SECRET_ACCESS_KEY\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\"
+                    }
+                  }
+                },
+                \"AuthenticationConfiguration\": {
+                  \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
+                }
+              }" \
+              --region ${{ secrets.AWS_REGION }}
+          fi
+          
+      - name: 🔧 更新 `giftlink-frontend/.env`
+        run: |
+          cat <<EOF > giftlink-frontend/.env
+          REACT_APP_BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
+          EOF
+          
+      - name: 📦 安裝express and cors in giftwebsite
+        run: |
+          cd ./giftwebsite
+          npm install express cors
+          cd ..
+          
+      - name: 📦 安裝所有必要的 packages in giftlink-frontend
+        run: |
+          cd ./giftlink-frontend
+          npm install
+          npm run build
+          cd ..
+
+      - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR (linux/amd64)
+        run: |
+          docker buildx create --use
+          docker buildx inspect --bootstrap
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest \
+            --push ./giftwebsite
+            
+      - name: 🚀 部署 giftwebsite 到 AWS App Runner
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+          
+          if [ -z "$SERVICE_ARN" ]; then
+            echo "🔄 創建 App Runner 服務..."
+            aws apprunner create-service \
+              --service-name giftwebsite \
+              --source-configuration '{
+                "ImageRepository": {
+                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftwebsite:latest",
+                  "ImageRepositoryType": "ECR",
+                  "ImageConfiguration": {
+                    "Port": "9000"
+                  }
+                },
+                "AuthenticationConfiguration": {
+                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
+                }
+              }' \
+              --region ${{ secrets.AWS_REGION }}
+          else
+            echo "🔄 更新 App Runner 服務..."
+            aws apprunner update-service \
+              --service-arn "$SERVICE_ARN" \
+              --source-configuration '{
+                "ImageRepository": {
+                  "ImageIdentifier": "${{ secrets.ECR_REPO }}/giftwebsite:latest",
+                  "ImageRepositoryType": "ECR",
+                  "ImageConfiguration": {
+                    "Port": "9000"
+                  }
+                },
+                "AuthenticationConfiguration": {
+                  "AccessRoleArn": "arn:aws:iam::253490795451:role/AppRunnerECRAccess"
+                }
+              }' \
+              --region ${{ secrets.AWS_REGION }}
+          fi
+
+          # 取得 App Runner 服務的網址
+          GIFTWEBSITE_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
+          if [ -z "$GIFTWEBSITE_URL" ]; then
+            echo "❌ App Runner 部署失敗"
+            exit 1
+          fi
+
+          echo "✅ GiftWebsite 可在這裡訪問: $GIFTWEBSITE_URL"
+          echo "GIFTWEBSITE_URL=$GIFTWEBSITE_URL" >> $GITHUB_ENV
 
 
 
