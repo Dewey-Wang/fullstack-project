@@ -121,25 +121,6 @@ jobs:
           AWS_REGION=${{ secrets.AWS_REGION }}
           JWT_SECRET=mysecret
           EOF
-          
-      - name: 🔧 更新 `Dockerfile`
-        run: |
-          cat <<EOF > giftlink-backend/Dockerfile
-          FROM node:18.12.1-bullseye-slim
-          
-          WORKDIR /usr/src/app
-          
-          COPY package*.json ./
-          
-          RUN npm install
-          
-          COPY . .
-          
-          EXPOSE 3060
-          
-          CMD ["node", "app.js"]
-          EOF
-      
 
      
       - name: 🔧 更新 `app.js` 來支援 DynamoDB
@@ -254,7 +235,6 @@ jobs:
           if [ "$STATUS" != "RUNNING" ]; then
               echo "🛑 停止 App Runner 服務..."
               aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
-            fi
           fi
           STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
 
