@@ -202,7 +202,15 @@ jobs:
           aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
           docker login --username AWS --password-stdin \
           ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com  
-
+          
+      - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
+        run: |
+          docker buildx create --use
+          docker buildx inspect --bootstrap
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest \
+            --push ./giftlink-backend
+            
       - name: ⏹️ 檢查並更新或創建 giftapp-backend 的 App Runner 服務
         run: |
           SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
@@ -299,7 +307,7 @@ jobs:
         run: |
           echo "📂 內容如下："
           cat giftlink-frontend/.env
-          echo "✅ BACKEND 可在這裡訪問: https://$BACKEND_URL"
+          echo "✅ BACKEND 可在這裡訪問: https://$(BACKEND_URL)"
 
       - name: 📦 安裝express and cors in giftwebsite
         run: |
@@ -314,7 +322,14 @@ jobs:
           npm install
           npm run build
           cd ..
-
+      
+      - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR (linux/amd64)
+        run: |
+          docker buildx create --use
+          docker buildx inspect --bootstrap
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest \
+            --push ./giftwebsite
             
       - name: 🚀 部署 giftwebsite 到 AWS App Runner
         run: |
