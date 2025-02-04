@@ -394,45 +394,15 @@ jobs:
           docker login --username AWS --password-stdin \
           ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com  
           
-      - name: 🏗️ 建立 Backend Docker Image 並推送到 AWS ECR
-        run: |
-          docker buildx create --use
-          docker buildx inspect --bootstrap
-          docker buildx build --platform linux/amd64,linux/arm64 \
-            -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest \
-            --push ./giftlink-backend
-            
       - name: ⏹️ 檢查並更新或創建 giftapp-backend 的 App Runner 服務
         run: |
           SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
-          
-          if [ -z "$SERVICE_ARN" ]; then
-            STATUS="NOT_FOUND"
-          else
-            STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-          fi
-          echo "🔍 App Runner 目前狀態: $STATUS"
-          
-          # 如果狀態為 OPERATION_IN_PROGRESS，就等到它完成
-          if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
-            echo "⚠️ `App Runner` 正在運行，等待完成..."
-            while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
-              sleep 10
-              STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-            done
-          fi
-          if [ "$STATUS" != "RUNNING" ]; then
-              echo "🛑 停止 App Runner 服務..."
-              aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
-          fi
-          STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-          
-          # 如果 App Runner 服務存在，則更新它
-          if [ "$STATUS" == "RUNNING" ]; then
-            echo "🔄 更新 App Runner 服務..."
-            aws apprunner update-service \
-              --service-arn "$SERVICE_ARN" \
-              --source-configuration "{
+
+          if [ "$SERVICE_ARN" == "None" ] || [ -z "$SERVICE_ARN" ]; then
+              echo "🔄 創建 App Runner 服務..."
+              aws apprunner create-service \
+                --service-name giftapp-backend \
+                --source-configuration "{
                 \"ImageRepository\": {
                   \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
                   \"ImageRepositoryType\": \"ECR\",
@@ -451,13 +421,11 @@ jobs:
                 }
               }" \
               --region ${{ secrets.AWS_REGION }}
-          
-          # 如果 App Runner 服務 **不存在或已刪除**，則創建新的
           else
-            echo "🚀 創建新的 App Runner 服務..."
-            aws apprunner create-service \
-              --service-name giftapp-backend \
-              --source-configuration "{
+              echo "🔄 更新 App Runner 服務..."
+              aws apprunner update-service \
+                --service-arn "$SERVICE_ARN" \
+                --source-configuration "{
                 \"ImageRepository\": {
                   \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
                   \"ImageRepositoryType\": \"ECR\",
@@ -477,7 +445,7 @@ jobs:
               }" \
               --region ${{ secrets.AWS_REGION }}
           fi
-          
+
       - name: 🔧 更新 giftlink-frontend/src/config.js
         run: |
           BACKEND_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
