@@ -50,54 +50,27 @@ jobs:
           cat <<EOF > giftlink-backend/util/import-mongo/index.js
           require("dotenv").config({ path: "giftlink-backend/util/import-mongo/.env" });
           const fs = require("fs");
-          const bcryptjs = require("bcryptjs");
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
           const { DynamoDBDocumentClient, PutCommand } = require("@aws-sdk/lib-dynamodb");
-          
+          const TABLE_NAME = process.env.DYNAMODB_TABLE;
+          if (!TABLE_NAME) {
+              console.error("❌ DYNAMODB_TABLE 未設置，請確認 .env");
+              process.exit(1);
+          }
           const client = new DynamoDBClient({ region: process.env.AWS_REGION });
           const dynamoDB = DynamoDBDocumentClient.from(client);
-          
-          // ✅ `giftapp-gifts` 預載入
-          async function loadGifts() {
-              const TABLE_GIFTS = "giftapp-gifts";
+          async function loadData() {
               console.log("📥 讀取 `gifts.json`...");
               const giftsFilePath = "giftlink-backend/util/import-mongo/gifts.json";
               const giftsData = JSON.parse(fs.readFileSync(giftsFilePath, "utf8")).docs;
               console.log("🚀 開始寫入 DynamoDB...");
               for (const gift of giftsData) {
-                  await dynamoDB.send(new PutCommand({ TableName: TABLE_GIFTS, Item: gift }));
-                  console.log(`✅ 已寫入: ${gift.name}`);
+                  await dynamoDB.send(new PutCommand({ TableName: TABLE_NAME, Item: gift }));
+                  console.log(\`✅ 已寫入: \${gift.name}\`);
               }
               console.log("✅ `gifts.json` 數據已成功導入 DynamoDB！");
           }
-          
-          // ✅ `giftapp-users` 預載入
-          async function loadUsers() {
-              const TABLE_USERS = "giftapp-users";
-              console.log("📥 新增測試用戶...");
-              
-              const salt = await bcryptjs.genSalt(10);
-              const hashedPassword = await bcryptjs.hash("password123", salt);
-              
-              const testUser = {
-                  id: "111111",
-                  email: "testuser@example.com",
-                  firstName: "Test",
-                  lastName: "User",
-                  password: hashedPassword,
-                  createdAt: new Date().toISOString(),
-              };
-          
-              await dynamoDB.send(new PutCommand({ TableName: TABLE_USERS, Item: testUser }));
-              console.log("✅ 測試用戶已建立: testuser@example.com / password123");
-          }
-          
-          async function main() {
-              await loadGifts();
-              await loadUsers();
-          }
-          
-          main().catch(console.error);
+          loadData().catch(console.error);
           EOF
       - name: 🔧 更新 `models/db.js`
         run: |
