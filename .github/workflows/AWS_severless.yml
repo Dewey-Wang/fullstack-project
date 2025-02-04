@@ -23,12 +23,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: 📦 安裝 AWS SDK v3 & dotenv
-        run: |
-          cd giftlink-backend
-          npm uninstall aws-sdk
-          npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb dotenv
-          cd ..
       - name: 🔧 更新 `util/import-mongo/.env`
         run: |
           cat <<EOF > giftlink-backend/util/import-mongo/.env
@@ -168,7 +162,12 @@ jobs:
           });
           EOF
 
-
+      - name: 📦 安裝 AWS SDK v3 & dotenv
+        run: |
+          cd giftlink-backend
+          npm uninstall aws-sdk
+          npm install @aws-sdk/client-dynamodb @aws-sdk/lib-dynamodb dotenv
+          cd ..
 
       - name: ✅ 確保 AWS DynamoDB Table 存在
         run: |
@@ -299,6 +298,9 @@ jobs:
               exit 1
           fi
           echo "🔍 取得的 Backend URL: https://$BACKEND_URL/"
+          echo "REACT_APP_BACKEND_URL=https://$BACKEND_URL/" > giftlink-frontend/.env
+          cat giftlink-frontend/.env  # 確保內容更新
+          
           cat <<EOF > giftlink-frontend/src/config.js
           const config = {
             backendUrl: "https://$BACKEND_URL/",
@@ -311,7 +313,6 @@ jobs:
       - name: 🔍 查看 `.env` 檔案內容 (完整顯示)
         run: |
           cd giftlink-frontend
-          export $(grep -v '^#' .env | xargs)  # 讓 `REACT_APP_BACKEND_URL` 載入
           npm install
           npm run build
           cd ..
@@ -322,6 +323,9 @@ jobs:
           npm install express cors
           cd ..
           
+      - name: 🔄 透過 Node.js `index.js`
+        run: |
+          node giftlink-frontend/src/index.js
       
       - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR (linux/amd64)
         run: |
