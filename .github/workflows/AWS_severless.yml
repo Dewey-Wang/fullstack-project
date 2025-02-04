@@ -351,8 +351,8 @@ jobs:
           fi
           
           # 取得 App Runner 服務的 URL
-          GIFTWEBSITE_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'][0].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
-          
+          GIFTWEBSITE_URL= $(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
+
           if [ -z "$GIFTWEBSITE_URL" ] || [ "$GIFTWEBSITE_URL" == "None" ]; then
               echo "❌ App Runner 部署失敗"
               exit 1
