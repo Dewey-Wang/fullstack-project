@@ -111,51 +111,75 @@ jobs:
           AWS_REGION=${{ secrets.AWS_REGION }}
           JWT_SECRET=mysecret
           EOF
-     
+          
       - name: 🔧 更新 `app.js` 來支援 DynamoDB
         run: |
           cat <<EOF > giftlink-backend/app.js
+          /*jshint esversion: 8 */
+          require("dotenv").config();
           const express = require("express");
           const cors = require("cors");
+          const pinoLogger = require("./logger");
+          
           const { getGifts, addGift } = require("./models/db");
           
           const app = express();
-          app.use(cors());
-          app.use(express.json());
-          
+          app.use("*", cors());
           const port = process.env.PORT || 3060;
           
-          // 確保 API 正常運行
+          // 確保 API 運行
           app.get("/", (req, res) => {
             res.send("Inside the server - Now using DynamoDB!");
           });
+
+          // 日誌中間件
+          const pinoHttp = require("pino-http");
+          app.use(pinoHttp({ logger: pinoLogger }));
           
-          // 讀取 DynamoDB 中的禮物數據
-          app.get("/api/gifts", async (req, res) => {
-            try {
-              const gifts = await getGifts();
-              res.json(gifts);
-            } catch (error) {
-              res.status(500).json({ error: error.message });
+          app.use(express.json());
+
+          // **導入 API 路由**
+          const authRoutes = require("./routes/authRoutes");  
+          const searchRoutes = require("./routes/searchRoutes");
+          
+          // **DynamoDB 的禮物 API**
+          app.use("/api/gifts", async (req, res, next) => {
+            if (req.method === "GET") {
+              try {
+                const gifts = await getGifts();
+                res.json(gifts);
+              } catch (error) {
+                next(error);
+              }
+            } else if (req.method === "POST") {
+              try {
+                const newGift = req.body;
+                await addGift(newGift);
+                res.json({ message: "Gift added!", gift: newGift });
+              } catch (error) {
+                next(error);
+              }
+            } else {
+              res.status(405).send("Method Not Allowed");
             }
           });
+
+          // **其他 API**
+          app.use("/api/auth", authRoutes);
+          app.use("/api/search", searchRoutes);
           
-          // 新增禮物到 DynamoDB
-          app.post("/api/gifts", async (req, res) => {
-            try {
-              const newGift = req.body;
-              await addGift(newGift);
-              res.json({ message: "Gift added!", gift: newGift });
-            } catch (error) {
-              res.status(500).json({ error: error.message });
-            }
+          // **全局錯誤處理**
+          app.use((err, req, res, next) => {
+            console.error(err);
+            res.status(500).send("Internal Server Error");
           });
-          
+
           app.listen(port, "0.0.0.0", () => {
             console.log("✅ Server running on port", port);
             console.log("✅ Using AWS DynamoDB Table:", process.env.DYNAMODB_TABLE);
           });
           EOF
+
       - name: ✅ 確保 AWS DynamoDB Table 存在
         run: |
           TABLE_NAME="giftapp-data"
