@@ -306,7 +306,7 @@ jobs:
         run: |
           cat <<EOF > giftlink-frontend/src/config.js
           const config = {
-            backendUrl: BACKEND_URL,
+            backendUrl: https://$BACKEND_URL/,
           };
           
           console.log(`backendUrl in config.js: ${config.backendUrl}`)
