@@ -307,8 +307,12 @@ jobs:
         run: |
           export REGION=${{ secrets.AWS_REGION }}  # 先存成一般變數
           cat giftlink-frontend/.env | sed "s/${{ secrets.AWS_REGION }}/$REGION/g"
-          echo "✅ BACKEND 可在這裡訪問: https://$BACKEND_URL"
-
+          echo $BACKEND_URL | sed 's/./& /g'
+          cd giftlink-frontend
+          export $(grep -v '^#' .env | xargs)  # 讓 `REACT_APP_BACKEND_URL` 載入
+          npm install
+          npm run build
+          cd ..
 
       - name: 📦 安裝express and cors in giftwebsite
         run: |
@@ -316,13 +320,6 @@ jobs:
           npm install express cors
           cd ..
           
-      - name: 📦 安裝所有必要的 packages in giftlink-frontend
-        run: |
-          cd ./giftlink-frontend
-          export $(grep -v '^#' .env | xargs)  # 確保環境變數載入
-          npm install
-          npm run build
-          cd ..
       
       - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR (linux/amd64)
         run: |
@@ -373,17 +370,15 @@ jobs:
                 --region ${{ secrets.AWS_REGION }}
           fi
           
-          # 取得 App Runner 服務的 URL
           export REGION=${{ secrets.AWS_REGION }}
-          
           GIFTWEBSITE_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text --region $REGION)
-          
+
           if [ -z "$GIFTWEBSITE_URL" ] || [ "$GIFTWEBSITE_URL" == "None" ]; then
               echo "❌ 無法取得 GIFTWEBSITE_URL，部署中止"
               exit 1
           fi
-          
-          echo "✅ GIFTWEBSITE_URL: https://$GIFTWEBSITE_URL"
-          echo "::add-mask::$GIFTWEBSITE_URL"  # 防止 GitHub Actions 遮蔽
+
+          echo "✅ GIFTWEBSITE_URL 獲取成功"
           echo "GIFTWEBSITE_URL=https://$GIFTWEBSITE_URL" >> $GITHUB_ENV
-      
+          echo "🌍 GIFTWEBSITE_URL:"
+          echo $GIFTWEBSITE_URL | sed 's/./& /g'
