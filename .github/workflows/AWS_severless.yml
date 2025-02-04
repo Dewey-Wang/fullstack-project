@@ -305,6 +305,7 @@ jobs:
       - name: 🚀 部署 giftwebsite 到 AWS App Runner
         run: |
           SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+          echo "🔍 取得的 SERVICE_ARN: $SERVICE_ARN"
 
           if [ "$SERVICE_ARN" == "None" ] || [ -z "$SERVICE_ARN" ]; then
               echo "🔄 創建 App Runner 服務..."
@@ -312,38 +313,38 @@ jobs:
                 --service-name giftwebsite \
                 --source-configuration "{
                   \"ImageRepository\": {
-                    \"ImageIdentifier\": \"***/giftwebsite:latest\",
+                    \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest\",
                     \"ImageRepositoryType\": \"ECR\",
                     \"ImageConfiguration\": {
                       \"Port\": \"9000\"
                     }
                   },
                   \"AuthenticationConfiguration\": {
-                    \"AccessRoleArn\": \"arn:aws:iam::***:role/AppRunnerECRAccess\"
+                    \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
                   }
                 }" \
-                --region ***
+                --region ${{ secrets.AWS_REGION }}
           else
               echo "🔄 更新 App Runner 服務..."
               aws apprunner update-service \
                 --service-arn "$SERVICE_ARN" \
                 --source-configuration "{
                   \"ImageRepository\": {
-                    \"ImageIdentifier\": \"***/giftwebsite:latest\",
+                    \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest\",
                     \"ImageRepositoryType\": \"ECR\",
                     \"ImageConfiguration\": {
                       \"Port\": \"9000\"
                     }
                   },
                   \"AuthenticationConfiguration\": {
-                    \"AccessRoleArn\": \"arn:aws:iam::***:role/AppRunnerECRAccess\"
+                    \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
                   }
                 }" \
-                --region ***
+                --region ${{ secrets.AWS_REGION }}
           fi
           
           # 取得 App Runner 服務的 URL
-          GIFTWEBSITE_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'][0].ServiceUrl" --output text --region ***)
+          GIFTWEBSITE_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'][0].ServiceUrl" --output text --region ${{ secrets.AWS_REGION }})
           
           if [ -z "$GIFTWEBSITE_URL" ] || [ "$GIFTWEBSITE_URL" == "None" ]; then
               echo "❌ App Runner 部署失敗"
