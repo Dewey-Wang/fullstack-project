@@ -299,15 +299,12 @@ jobs:
               exit 1
           fi
           
-          echo "REACT_APP_BACKEND_URL=https://$BACKEND_URL" > giftlink-frontend/.env
+          echo "REACT_APP_BACKEND_URL=https://$BACKEND_URL/" > giftlink-frontend/.env
           cat giftlink-frontend/.env  # 確保內容更新
 
       
       - name: 🔍 查看 `.env` 檔案內容 (完整顯示)
         run: |
-          export REGION=${{ secrets.AWS_REGION }}  # 先存成一般變數
-          cat giftlink-frontend/.env | sed "s/${{ secrets.AWS_REGION }}/$REGION/g"
-          echo $BACKEND_URL | sed 's/./& /g'
           cd giftlink-frontend
           export $(grep -v '^#' .env | xargs)  # 讓 `REACT_APP_BACKEND_URL` 載入
           npm install
