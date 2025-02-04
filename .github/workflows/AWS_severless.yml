@@ -77,32 +77,19 @@ jobs:
           cat <<EOF > giftlink-backend/models/db.js
           require("dotenv").config();
           const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-          const { DynamoDBDocumentClient, ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
+          const { DynamoDBDocumentClient } = require("@aws-sdk/lib-dynamodb");
           
           const client = new DynamoDBClient({
-              region: process.env.AWS_REGION,
-              credentials: {
-                  accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-                  secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-              },
+            region: process.env.AWS_REGION,
+            credentials: {
+              accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+              secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+            },
           });
           
           const db = DynamoDBDocumentClient.from(client);
-          const TABLE_NAME = process.env.DYNAMODB_TABLE;
           
-          async function getGifts() {
-              const params = new ScanCommand({ TableName: TABLE_NAME });
-              const data = await db.send(params);
-              return data.Items;
-          }
-          
-          async function addGift(gift) {
-              const params = new PutCommand({ TableName: TABLE_NAME, Item: gift });
-              await db.send(params);
-              return gift;
-          }
-          
-          module.exports = { getGifts, addGift };
+          module.exports = { db };
           EOF
       - name: 🔧 更新 `.env`，移除 MongoDB 並添加 DynamoDB
         run: |
@@ -119,40 +106,59 @@ jobs:
           require("dotenv").config();
           const express = require("express");
           const cors = require("cors");
-          const pinoLogger = require("./logger");
-          const { DynamoDBClient } = require("@aws-sdk/client-dynamodb");
-          const { DynamoDBDocumentClient, ScanCommand, PutCommand, QueryCommand } = require("@aws-sdk/lib-dynamodb");
-          const bcryptjs = require("bcryptjs");
-          const jwt = require("jsonwebtoken");
+          const pinoHttp = require("pino-http");
+          const logger = require("./logger");
+          
+          const giftRoutes = require("./routes/giftRoutes");
+          const authRoutes = require("./routes/authRoutes");
+          const searchRoutes = require("./routes/searchRoutes");
           
           const app = express();
           app.use(cors());
           app.use(express.json());
-          app.use(require("pino-http")({ logger: pinoLogger }));
+          app.use(pinoHttp({ logger }));
           
           const port = process.env.PORT || 3060;
-          const TABLE_USERS = "giftapp-users";
-          const TABLE_GIFTS = "giftapp-gifts";
           
-          const client = new DynamoDBClient({ region: process.env.AWS_REGION });
-          const db = DynamoDBDocumentClient.from(client);
-          
-          // ===============================
-          // 🏠 API Health Check
-          // ===============================
+          // API Health Check
           app.get("/", (req, res) => {
             res.send("Inside the server - Now using DynamoDB!");
           });
+          
+          // 註冊 API 路由
+          app.use("/api/gifts", giftRoutes);
+          app.use("/api/auth", authRoutes);
+          app.use("/api/search", searchRoutes);
+          
+          // 全局錯誤處理
+          app.use((err, req, res, next) => {
+            console.error(err);
+            res.status(500).send("Internal Server Error");
+          });
+          
+          app.listen(port, () => {
+            console.log(`✅ Server running on port ${port}`);
+          });
 
-                  // ===============================
-          // 🔒 Authentication Routes
-          // ===============================
-          // 📌 User Registration
-          app.post("/api/auth/register", async (req, res) => {
+          EOF
+      - name: 🔧 更新 `authRoutes.js`
+        run: |
+          cat <<EOF > giftlink-backend/routes/authRoutes.js
+          const express = require("express");
+          const bcryptjs = require("bcryptjs");
+          const jwt = require("jsonwebtoken");
+          const { db } = require("../models/db");
+          const { ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
+          
+          const router = express.Router();
+          const JWT_SECRET = process.env.JWT_SECRET;
+          const TABLE_USERS = "giftapp-users";
+          
+          // 🏠 註冊用戶
+          router.post("/register", async (req, res) => {
             try {
               const { email, firstName, lastName, password } = req.body;
-
-              // 查找用戶是否已存在
+          
               const existingUsers = await db.send(
                 new ScanCommand({
                   TableName: TABLE_USERS,
@@ -160,16 +166,15 @@ jobs:
                   ExpressionAttributeValues: { ":email": email },
                 })
               );
-
+          
               if (existingUsers.Items.length > 0) {
                 return res.status(400).json({ error: "Email already exists" });
               }
-
-              // 密碼加密
+          
               const salt = await bcryptjs.genSalt(10);
               const hashedPassword = await bcryptjs.hash(password, salt);
               const userId = `USER-${Date.now()}`;
-
+          
               await db.send(
                 new PutCommand({
                   TableName: TABLE_USERS,
@@ -183,21 +188,20 @@ jobs:
                   },
                 })
               );
-                        const authtoken = jwt.sign({ userId }, process.env.JWT_SECRET);
+          
+              const authtoken = jwt.sign({ userId }, JWT_SECRET);
               res.json({ authtoken, email });
             } catch (e) {
               console.error(e);
               res.status(500).json({ error: "Internal Server Error" });
             }
           });
-
-
-          // 📌 User Login
-          app.post("/api/auth/login", async (req, res) => {
+          
+          // 🔑 用戶登入
+          router.post("/login", async (req, res) => {
             try {
               const { email, password } = req.body;
           
-              // 用 `ScanCommand` 找 email
               const users = await db.send(
                 new ScanCommand({
                   TableName: TABLE_USERS,
@@ -212,24 +216,33 @@ jobs:
           
               const theUser = users.Items[0];
               const match = await bcryptjs.compare(password, theUser.password);
-                  if (!match) {
+              if (!match) {
                 return res.status(401).json({ error: "Wrong password" });
               }
           
-              const authtoken = jwt.sign({ userId: theUser.id }, process.env.JWT_SECRET);
+              const authtoken = jwt.sign({ userId: theUser.id }, JWT_SECRET);
               res.json({ authtoken, userName: theUser.firstName, userEmail: theUser.email });
             } catch (e) {
               console.error(e);
               res.status(500).json({ error: "Internal Server Error" });
             }
           });
-
           
-          // ===============================
-          // 🎁 Gift Routes
-          // ===============================
-          // 📌 Get all gifts
-          app.get("/api/gifts", async (req, res) => {
+          module.exports = router;
+          EOF
+
+      - name: 🔧 更新 `giftRoutes.js`
+        run: |
+          cat <<EOF > giftlink-backend/routes/giftRoutes.js
+          const express = require("express");
+          const { db } = require("../models/db");
+          const { ScanCommand, PutCommand } = require("@aws-sdk/lib-dynamodb");
+          
+          const router = express.Router();
+          const TABLE_GIFTS = "giftapp-gifts";
+          
+          // 📌 取得所有禮物
+          router.get("/", async (req, res) => {
             try {
               const data = await db.send(new ScanCommand({ TableName: TABLE_GIFTS }));
               res.json(data.Items || []);
@@ -238,8 +251,8 @@ jobs:
             }
           });
           
-          // 📌 Add new gift
-          app.post("/api/gifts", async (req, res) => {
+          // 📌 新增禮物
+          router.post("/", async (req, res) => {
             try {
               const gift = {
                 id: `GIFT-${Date.now()}`,
@@ -254,10 +267,21 @@ jobs:
             }
           });
           
-          // ===============================
-          // 🔎 Search Routes
-          // ===============================
-          app.get("/api/search", async (req, res) => {
+          module.exports = router;
+          EOF
+          
+      - name: 🔧 更新 `searchRoutes.js`
+        run: |
+          cat <<EOF > giftlink-backend/routes/searchRoutes.js
+          const express = require("express");
+          const { db } = require("../models/db");
+          const { ScanCommand } = require("@aws-sdk/lib-dynamodb");
+          
+          const router = express.Router();
+          const TABLE_GIFTS = "giftapp-gifts";
+          
+          // 📌 搜尋禮物
+          router.get("/", async (req, res) => {
             try {
               let filterExpressions = [];
               let expressionAttributeValues = {};
@@ -269,21 +293,6 @@ jobs:
                 expressionAttributeNames["#name"] = "name";
               }
           
-              if (req.query.category) {
-                filterExpressions.push("category = :category");
-                expressionAttributeValues[":category"] = req.query.category;
-              }
-          
-              if (req.query.condition) {
-                filterExpressions.push("condition = :condition");
-                expressionAttributeValues[":condition"] = req.query.condition;
-              }
-          
-              if (req.query.age_years) {
-                filterExpressions.push("age_years <= :age");
-                expressionAttributeValues[":age"] = parseInt(req.query.age_years);
-              }
-             
               const params = {
                 TableName: TABLE_GIFTS,
                 FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
@@ -297,21 +306,8 @@ jobs:
               res.status(500).json({ error: e.message });
             }
           });
-
           
-          // ===============================
-          // ⚠️ Error Handling
-          // ===============================
-          app.use((err, req, res, next) => {
-            console.error(err);
-            res.status(500).send("Internal Server Error");
-          });
-          
-          app.listen(port, "0.0.0.0", () => {
-            console.log(`✅ Server running on port ${port}`);
-            console.log(`✅ Using AWS DynamoDB Tables: Users: ${TABLE_USERS}, Gifts: ${TABLE_GIFTS}`);
-          });
-
+          module.exports = router;
           EOF
           
       - name: ✅ 確保 AWS DynamoDB Table 存在
