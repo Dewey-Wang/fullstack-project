@@ -196,79 +196,77 @@ jobs:
             
       - name: ⏹️ 檢查並更新或創建 giftapp-backend 的 App Runner 服務
         run: |
-          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
-          
-          if [ -z "$SERVICE_ARN" ]; then
-            STATUS="NOT_FOUND"
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftapp-backend'].ServiceArn" --output text --region us-east-1)
+          if [ -z "$SERVICE_ARN" ] || [ "$SERVICE_ARN" == "None" ]; then
+            echo "🚀 `giftapp-backend` 服務不存在，將直接創建新的 App Runner 服務..."
           else
-            STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-          fi
-          echo "🔍 App Runner 目前狀態: $STATUS"
+            STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region us-east-1)
+            
+            echo "🔍 App Runner 目前狀態: $STATUS"
+            
+            if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
+              echo "⚠️ `App Runner` 正在運行，等待完成..."
+              while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
+                sleep 10
+                STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region us-east-1)
+              done
+            fi
           
-          # 如果狀態為 OPERATION_IN_PROGRESS，就等到它完成
-          if [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; then
-            echo "⚠️ `App Runner` 正在運行，等待完成..."
-            while [ "$STATUS" == "OPERATION_IN_PROGRESS" ]; do
-              sleep 10
-              STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-            done
-          fi
-          if [ "$STATUS" != "RUNNING" ]; then
-              echo "🛑 停止 App Runner 服務..."
-              aws apprunner delete-service --service-arn "$SERVICE_ARN" --region ${{ secrets.AWS_REGION }}
-          fi
-          STATUS=$(aws apprunner describe-service --service-arn "$SERVICE_ARN" --query "Service.Status" --output text --region ${{ secrets.AWS_REGION }})
-          
-          # 如果 App Runner 服務存在，則更新它
-          if [ "$STATUS" == "RUNNING" ]; then
-            echo "🔄 更新 App Runner 服務..."
-            aws apprunner update-service \
-              --service-arn "$SERVICE_ARN" \
-              --source-configuration "{
-                \"ImageRepository\": {
-                  \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
-                  \"ImageRepositoryType\": \"ECR\",
-                  \"ImageConfiguration\": {
-                    \"Port\": \"3060\",
-                    \"RuntimeEnvironmentVariables\": {
-                      \"DYNAMODB_TABLE\": \"giftapp-data\",
-                      \"AWS_REGION\": \"${{ secrets.AWS_REGION }}\",
-                      \"AWS_ACCESS_KEY_ID\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\",
-                      \"AWS_SECRET_ACCESS_KEY\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\"
+            if [ "$STATUS" == "RUNNING" ]; then
+              echo "🔄 更新 App Runner 服務..."
+              aws apprunner update-service \
+                --service-arn "$SERVICE_ARN" \
+                --source-configuration "{
+                  \"ImageRepository\": {
+                    \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
+                    \"ImageRepositoryType\": \"ECR\",
+                    \"ImageConfiguration\": {
+                      \"Port\": \"3060\",
+                      \"RuntimeEnvironmentVariables\": {
+                        \"DYNAMODB_TABLE\": \"giftapp-data\",
+                        \"AWS_REGION\": \"us-east-1\",
+                        \"AWS_ACCESS_KEY_ID\": \"${AWS_ACCESS_KEY_ID}\",
+                        \"AWS_SECRET_ACCESS_KEY\": \"${AWS_SECRET_ACCESS_KEY}\"
+                      }
                     }
+                  },
+                  \"AuthenticationConfiguration\": {
+                    \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
                   }
-                },
-                \"AuthenticationConfiguration\": {
-                  \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
-                }
-              }" \
-              --region ${{ secrets.AWS_REGION }}
-          
-          # 如果 App Runner 服務 **不存在或已刪除**，則創建新的
-          else
-            echo "🚀 創建新的 App Runner 服務..."
-            aws apprunner create-service \
-              --service-name giftapp-backend \
-              --source-configuration "{
-                \"ImageRepository\": {
-                  \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
-                  \"ImageRepositoryType\": \"ECR\",
-                  \"ImageConfiguration\": {
-                    \"Port\": \"3060\",
-                    \"RuntimeEnvironmentVariables\": {
-                      \"DYNAMODB_TABLE\": \"giftapp-data\",
-                      \"AWS_REGION\": \"${{ secrets.AWS_REGION }}\",
-                      \"AWS_ACCESS_KEY_ID\": \"${{ secrets.AWS_ACCESS_KEY_ID }}\",
-                      \"AWS_SECRET_ACCESS_KEY\": \"${{ secrets.AWS_SECRET_ACCESS_KEY }}\"
-                    }
-                  }
-                },
-                \"AuthenticationConfiguration\": {
-                  \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
-                }
-              }" \
-              --region ${{ secrets.AWS_REGION }}
+                }" \
+                --region us-east-1
+              exit 0  # 成功更新後，結束腳本
+            else
+              echo "🛑 服務狀態異常 ($STATUS)，準備刪除並重新創建..."
+              aws apprunner delete-service --service-arn "$SERVICE_ARN" --region us-east-1
+              echo "🕒 等待 App Runner 服務刪除完成..."
+              sleep 20
+            fi
           fi
+          
+          echo "🚀 創建新的 App Runner 服務..."
+          aws apprunner create-service \
+            --service-name giftapp-backend \
+            --source-configuration "{
+              \"ImageRepository\": {
+                \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
+                \"ImageRepositoryType\": \"ECR\",
+                \"ImageConfiguration\": {
+                  \"Port\": \"3060\",
+                  \"RuntimeEnvironmentVariables\": {
+                    \"DYNAMODB_TABLE\": \"giftapp-data\",
+                    \"AWS_REGION\": \"us-east-1\",
+                    \"AWS_ACCESS_KEY_ID\": \"${AWS_ACCESS_KEY_ID}\",
+                    \"AWS_SECRET_ACCESS_KEY\": \"${AWS_SECRET_ACCESS_KEY}\"
+                  }
+                }
+              },
+              \"AuthenticationConfiguration\": {
+                \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
+              }
+            }" \
+            --region us-east-1
+
           
       - name: 🔧 更新 giftlink-frontend/src/config.js
         run: |
