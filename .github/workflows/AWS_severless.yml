@@ -317,25 +317,145 @@ jobs:
           npm run build
           cd ..
 
+      - name: 📝 生成 `giftlink-frontend` 的 Dockerfile
+        run: |
+          cat <<EOF > giftlink-frontend/Dockerfile
+          # 1. 使用 Node.js 建立 React 前端應用
+          FROM node:18-alpine AS build
+          WORKDIR /app
+          COPY package.json package-lock.json ./
+          RUN npm install
+          COPY . .
+          RUN npm run build
+
+          # 2. 使用 Nginx 作為靜態網站伺服器
+          FROM nginx:alpine
+          WORKDIR /usr/share/nginx/html
+          RUN rm -rf ./*
+          COPY --from=build /app/build .
+          EXPOSE 80
+          CMD ["nginx", "-g", "daemon off;"]
+          EOF
+
+          echo "✅ Dockerfile 已成功建立！"
+          cat giftlink-frontend/Dockerfile
+          
+      - name: 🏗️ 建立 giftlink-frontend Docker Image 並推送到 AWS ECR
+        run: |
+          docker buildx create --use
+          docker buildx inspect --bootstrap
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftlink-frontend:latest \
+            --push ./giftlink-frontend
+            
+      - name: 🚀 部署 giftlink-frontend 到 AWS App Runner
+        run: |
+          SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftlink-frontend'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
+          echo "🔍 取得的 SERVICE_ARN: $SERVICE_ARN"
+
+          if [ "$SERVICE_ARN" == "None" ] || [ -z "$SERVICE_ARN" ]; then
+              echo "🔄 創建 App Runner 服務..."
+              aws apprunner create-service \
+                --service-name giftlink-frontend \
+                --source-configuration "{
+                  \"ImageRepository\": {
+                    \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftlink-frontend:latest\",
+                    \"ImageRepositoryType\": \"ECR\",
+                    \"ImageConfiguration\": {
+                      \"Port\": \"80\"
+                    }
+                  },
+                  \"AuthenticationConfiguration\": {
+                    \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
+                  }
+                }" \
+                --region ${{ secrets.AWS_REGION }}
+          else
+              echo "🔄 更新 App Runner 服務..."
+              aws apprunner update-service \
+                --service-arn "$SERVICE_ARN" \
+                --source-configuration "{
+                  \"ImageRepository\": {
+                    \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftlink-frontend:latest\",
+                    \"ImageRepositoryType\": \"ECR\",
+                    \"ImageConfiguration\": {
+                      \"Port\": \"80\"
+                    }
+                  },
+                  \"AuthenticationConfiguration\": {
+                    \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
+                  }
+                }" \
+                --region ${{ secrets.AWS_REGION }}
+          fi
+
+
       - name: 📦 安裝express and cors in giftwebsite
         run: |
           cd ./giftwebsite
           npm install express cors
           cd ..
           
-      - name: 🔄 透過 Node.js `index.js`
+
+     - name: 🛠️ 建立 `giftwebsite/Dockerfile`
         run: |
-          node giftlink-frontend/src/index.js
-      
-      - name: 🏗️ 建立 giftwebsite Docker Image 並推送到 AWS ECR (linux/amd64)
+          cat <<EOF > giftwebsite/Dockerfile
+          # 1️⃣ 建置 React 前端
+          FROM node:18-alpine AS build
+          WORKDIR /app
+          COPY package.json package-lock.json ./
+          RUN npm install
+          COPY . .
+          RUN npm run build
+
+          # 2️⃣ 運行 Express 伺服器
+          FROM node:18-alpine
+          WORKDIR /app
+          COPY --from=build /app/package.json .
+          COPY --from=build /app/node_modules ./node_modules
+          COPY --from=build /app/build ./build
+          COPY --from=build /app/server.js .
+          ENV PORT=9000
+          EXPOSE 9000
+          CMD ["node", "server.js"]
+          EOF
+
+      - name: 🛠️ 建立 `giftwebsite/server.js`
+        run: |
+          cat <<EOF > giftwebsite/server.js
+          const express = require("express");
+          const path = require("path");
+          const cors = require("cors");
+
+          const app = express();
+          const PORT = process.env.PORT || 9000;
+
+          // 啟用 CORS
+          app.use(cors());
+
+          // 提供 React 靜態檔案
+          app.use(express.static(path.join(__dirname, "build")));
+
+          // 讓 React 處理所有路由
+          app.get("*", (req, res) => {
+            res.sendFile(path.join(__dirname, "build", "index.html"));
+          });
+
+          // 啟動伺服器
+          app.listen(PORT, () => {
+            console.log(\`✅ giftwebsite running on port \${PORT}\`);
+          });
+          EOF
+
+      - name: 🏗️ 建立 `giftwebsite` Docker Image 並推送到 AWS ECR
         run: |
           docker buildx create --use
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64,linux/arm64 \
             -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest \
             --push ./giftwebsite
-            
-      - name: 🚀 部署 giftwebsite 到 AWS App Runner
+
+      - name: 🚀 部署 `giftwebsite` 到 AWS App Runner
         run: |
           SERVICE_ARN=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceArn" --output text --region ${{ secrets.AWS_REGION }})
           echo "🔍 取得的 SERVICE_ARN: $SERVICE_ARN"
@@ -375,7 +495,9 @@ jobs:
                 }" \
                 --region ${{ secrets.AWS_REGION }}
           fi
-          
+
+      - name: 🔎 獲取 `giftwebsite` 部署網址
+        run: |
           export REGION=${{ secrets.AWS_REGION }}
           GIFTWEBSITE_URL=$(aws apprunner list-services --query "ServiceSummaryList[?ServiceName=='giftwebsite'].ServiceUrl" --output text --region $REGION)
 
@@ -384,7 +506,5 @@ jobs:
               exit 1
           fi
 
-          echo "✅ GIFTWEBSITE_URL 獲取成功"
+          echo "✅ GIFTWEBSITE_URL: https://$GIFTWEBSITE_URL"
           echo "GIFTWEBSITE_URL=https://$GIFTWEBSITE_URL" >> $GITHUB_ENV
-          echo "🌍 GIFTWEBSITE_URL:"
-          echo $GIFTWEBSITE_URL | sed 's/./& /g'
