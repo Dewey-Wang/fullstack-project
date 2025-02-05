@@ -227,10 +227,11 @@ jobs:
           fi
 
           echo "✅ 你的 GiftWebsite 可在這裡訪問: http://$GIFTWEBSITE_URL"
-      
+          Method_1=$(kubectl get svc giftwebsite-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
       - name: 🔄 Update README with website Link
         run: |
-          sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [http://$GIFTWEBSITE_URL](http://$GIFTWEBSITE_URL)|" README.md
+          sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [http://$Method_1](http://$Method_1)|" README.md
 
       - name: 📢 Commit Updated README
         run: |
