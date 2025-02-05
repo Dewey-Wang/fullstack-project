@@ -221,7 +221,7 @@ jobs:
               );
           
               console.log("✅ User registered successfully!");
-              const authtoken = jwt.sign({ userId }, JWT_SECRET);
+              const authtoken = jwt.sign({ userId }, JWT_SECRET, { expiresIn: "30m" });
           
               res.json({ authtoken, email });
             } catch (e) {
@@ -262,7 +262,7 @@ jobs:
               }
           
               console.log("✅ Login successful!");
-              const authtoken = jwt.sign({ userId: theUser.id }, JWT_SECRET);
+              const authtoken = jwt.sign({ userId: theUser.id }, JWT_SECRET, { expiresIn: "30m" });
               res.json({ authtoken, userName: theUser.firstName, userEmail: theUser.email });
           
             } catch (e) {
