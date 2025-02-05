@@ -21,6 +21,7 @@ GiftLink is a platform that allows users to share and receive gifts easily. The 
 ---
 
 ## 🔧 Technology Overview
+<!-- id="technology-overview" -->
 
 ### Backend - giftlink-backend
 <!-- id="backend---giftlink-backend" -->
