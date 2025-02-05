@@ -15,7 +15,7 @@ jobs:
     steps:
       - name: 🔧 更新 `/giftlink-frontend/src/components/MainPage/MainPage.js`
         run: |
-          cat <<EOF > giftlink-frontend/src/components/MainPage/MainPage.js
+          cat <<EOF > /giftlink-frontend/src/components/MainPage/MainPage.js
           import React, { useState, useEffect } from 'react';
           import { useNavigate } from 'react-router-dom';
           import {urlConfig} from '../../config';
