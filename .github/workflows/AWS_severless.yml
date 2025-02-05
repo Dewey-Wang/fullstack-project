@@ -752,20 +752,7 @@ jobs:
 
           echo "✅ GIFTWEBSITE_URL: https://$GIFTWEBSITE_URL"
           echo "GIFTWEBSITE_URL=https://$GIFTWEBSITE_URL" >> $GITHUB_ENV
-      
-      - name: 🔄 Stash Uncommitted Changes (Avoid Conflicts)
-        run: git stash --include-untracked || echo "No changes to stash"
-
-      - name: 🔄 Pull Latest Changes (Handle Conflicts)
-        run: |
-          git fetch origin main
-          git reset --hard origin/main
-          git clean -fd  # 確保工作目錄乾淨
-
-      - name: 🔄 Restore Stashed Changes (Except README.md)
-        run: git stash pop || echo "No stash found"
-
-      - name: 🔄 Update README with Deployment Links
+      - name: 🔄 Update README with website Link
         run: |
           sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
           sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [https://$GIFTWEBSITE_URL](https://$GIFTWEBSITE_URL)|" README.md
@@ -776,4 +763,4 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git add README.md
           git commit -m "🔄 Updated README with App Runner deployment link"
-          git push origin main
+          git push
