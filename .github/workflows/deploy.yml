@@ -237,6 +237,7 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          git pull --rebase  # 先拉取最新變更，避免衝突
           git add README.md
           git commit -m "🔄 Updated README with EKS deployment link"
           git push
