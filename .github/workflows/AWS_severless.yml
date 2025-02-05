@@ -360,40 +360,52 @@ jobs:
           
           // 📌 搜尋禮物
           router.get("/", async (req, res) => {
-            try {
-              let filterExpressions = [];
-              let expressionAttributeValues = {};
-              let expressionAttributeNames = {};
+              try {
+                  let filterExpressions = [];
+                  let expressionAttributeValues = {};
+                  let expressionAttributeNames = {};
           
-              if (req.query.name) {
-                filterExpressions.push("contains(#name, :name)");
-                expressionAttributeValues[":name"] = req.query.name;
-                expressionAttributeNames["#name"] = "name";  // ✅ 修正 name 為保留字
+                  if (req.query.name) {
+                      filterExpressions.push("contains(#name, :name)");
+                      expressionAttributeValues[":name"] = req.query.name;
+                      expressionAttributeNames["#name"] = "name";
+                  }
+          
+                  if (req.query.category) {
+                      filterExpressions.push("#category = :category");
+                      expressionAttributeValues[":category"] = req.query.category;
+                      expressionAttributeNames["#category"] = "category";
+                  }
+          
+                  if (req.query.condition) {
+                      filterExpressions.push("#condition = :condition");
+                      expressionAttributeValues[":condition"] = req.query.condition;
+                      expressionAttributeNames["#condition"] = "condition";
+                  }
+          
+                  if (req.query.age_years) {
+                      filterExpressions.push("age_years <= :age");
+                      expressionAttributeValues[":age"] = Number(req.query.age_years);
+                  }
+          
+                  let params = {
+                      TableName: TABLE_GIFTS,
+                      FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
+                      ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0 ? expressionAttributeValues : undefined,
+                      ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
+                      ProjectionExpression: "#name, #category, #condition, age_years, #description",
+                  };
+          
+                  console.log("🔍 Searching with params:", JSON.stringify(params, null, 2));
+          
+                  const gifts = await db.send(new ScanCommand(params));
+                  res.json(gifts.Items || []);
+              } catch (e) {
+                  console.error("❌ Search Error:", e);
+                  res.status(500).json({ error: e.message });
               }
-          
-              let params = {
-                TableName: TABLE_GIFTS,
-                FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
-                ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0 ? expressionAttributeValues : undefined,
-                ExpressionAttributeNames: {
-                  "#name": "name",
-                  "#condition": "condition",
-                  "#description": "description"  // ✅ 修正 `description` 為保留字
-                },
-                ProjectionExpression: "#name, category, #condition, age_years, #description",  // ✅ 修正 ProjectionExpression
-              };
-
-          
-              console.log("🔍 Searching with params:", JSON.stringify(params, null, 2));
-          
-              const gifts = await db.send(new ScanCommand(params));
-              res.json(gifts.Items || []);
-            } catch (e) {
-              console.error("❌ Search Error:", e);
-              res.status(500).json({ error: e.message });
-            }
           });
-          
+                  
           module.exports = router;
 
           EOF
