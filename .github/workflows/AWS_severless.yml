@@ -188,11 +188,13 @@ jobs:
               const existingUsers = await db.send(
                 new QueryCommand({
                   TableName: TABLE_USERS,
-                  IndexName: "email-index", // ✅ 使用 GSI
+                  IndexName: "email-index",
                   KeyConditionExpression: "email = :email",
+                  ExpressionAttributeNames: { "email": "email" },
                   ExpressionAttributeValues: { ":email": email },
                 })
               );
+
           
               console.log("📌 Query response:", existingUsers.Items);
           
@@ -234,16 +236,21 @@ jobs:
           // 🔑 用戶登入
           router.post("/login", async (req, res) => {
             try {
+              console.log("📌 Login API hit! Request body:", req.body);
+          
               const { email, password } = req.body;
           
-              // 🔹 查找 Email
+              console.log("📌 Checking if user exists...");
               const users = await db.send(
                 new QueryCommand({
                   TableName: TABLE_USERS,
+                  IndexName: "email-index",  // ✅ 指定 GSI
                   KeyConditionExpression: "email = :email",
                   ExpressionAttributeValues: { ":email": email },
                 })
               );
+          
+              console.log("📌 Query response:", users.Items);
           
               if (!users.Items || users.Items.length === 0) {
                 return res.status(404).json({ error: "User not found" });
@@ -255,13 +262,16 @@ jobs:
                 return res.status(401).json({ error: "Wrong password" });
               }
           
+              console.log("✅ Login successful!");
               const authtoken = jwt.sign({ userId: theUser.id }, JWT_SECRET);
               res.json({ authtoken, userName: theUser.firstName, userEmail: theUser.email });
+          
             } catch (e) {
               console.error("❌ Error in login:", e);
               res.status(500).json({ error: "Internal Server Error" });
             }
           });
+
           
           module.exports = router;
           EOF
