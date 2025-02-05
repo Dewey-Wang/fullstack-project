@@ -95,7 +95,7 @@ This project is deployed to AWS using **GitHub Actions**, implementing two diffe
    
 2. **Method 2: Deploying with AWS App Runner and DynamoDB** <a id="method-2-deploying-with-aws-app-runner-and-dynamodb"></a>
    
-🔗Link for Method 2: *(Auto-updated by GitHub Actions)*
+🔗Link for Method 2: [https://https://dy6kdtagsb.us-east-1.awsapprunner.com](https://https://dy6kdtagsb.us-east-1.awsapprunner.com)
 
 📌 **How Deployment Links Are Updated**
 - The **GitHub Actions workflow automatically updates the correct URLs** inside this README.
