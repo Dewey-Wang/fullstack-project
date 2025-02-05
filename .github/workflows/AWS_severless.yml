@@ -13,11 +13,17 @@ permissions:
   contents: write
 
 jobs:
+  start:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ✅ 確保 Workflow 可以執行
+        run: echo "AWS Serverless Workflow Started!"
+
   deploy:
     runs-on: ubuntu-latest
+    needs: start  # 讓 deploy 依賴 start，確保 workflow 可以執行
     permissions:
       contents: write
-    needs: deploy  # 這行確保 deploy.yml 先跑完
 
     steps:
       - name: 🚀 檢出程式碼
