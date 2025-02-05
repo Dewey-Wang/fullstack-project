@@ -190,11 +190,9 @@ jobs:
                   TableName: TABLE_USERS,
                   IndexName: "email-index",
                   KeyConditionExpression: "email = :email",
-                  ExpressionAttributeNames: { "email": "email" },
                   ExpressionAttributeValues: { ":email": email },
                 })
               );
-
           
               console.log("📌 Query response:", existingUsers.Items);
           
@@ -212,7 +210,7 @@ jobs:
                 new PutCommand({
                   TableName: TABLE_USERS,
                   Item: {
-                    id: userId, 
+                    id: userId,
                     email,
                     firstName,
                     lastName,
@@ -231,6 +229,7 @@ jobs:
               res.status(500).json({ error: "Internal Server Error" });
             }
           });
+
 
           
           // 🔑 用戶登入
