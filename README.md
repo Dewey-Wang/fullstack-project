@@ -91,7 +91,7 @@ This project is deployed to AWS using **GitHub Actions**, implementing two diffe
 
 1. **Method 1: Deploying with AWS EKS and MongoDB** <a id="method-1-deploying-with-aws-eks-and-mongodb"></a>
    
-🔗Link for Method 1: [http://http://aad2ff832f54e48fcb854e744ecf8844-1275707135.us-east-1.elb.amazonaws.com](http://http://aad2ff832f54e48fcb854e744ecf8844-1275707135.us-east-1.elb.amazonaws.com)
+🔗Link for Method 1: [http://aad2ff832f54e48fcb854e744ecf8844-1275707135.us-east-1.elb.amazonaws.com](http://aad2ff832f54e48fcb854e744ecf8844-1275707135.us-east-1.elb.amazonaws.com)
    
 2. **Method 2: Deploying with AWS App Runner and DynamoDB** <a id="method-2-deploying-with-aws-app-runner-and-dynamodb"></a>
    
