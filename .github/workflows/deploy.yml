@@ -13,6 +13,16 @@ jobs:
       contents: write
 
     steps:
+      - name: 🚀 檢出程式碼
+        uses: actions/checkout@v4
+
+      - name: 🔐 設定 AWS CLI
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+      
       - name: 🔧 更新 `/giftlink-frontend/src/components/MainPage/MainPage.js`
         run: |
           cat <<EOF > /giftlink-frontend/src/components/MainPage/MainPage.js
@@ -106,17 +116,6 @@ jobs:
           
           export default MainPage;
           EOF
-
-      - name: 🚀 檢出程式碼
-        uses: actions/checkout@v4
-
-      - name: 🔐 設定 AWS CLI
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
       - name: 🛠 安裝 eksctl
         run: |
           curl --silent --location "https://github.com/weaveworks/eksctl/releases/latest/download/eksctl_$(uname -s)_amd64.tar.gz" | tar xz -C /tmp
