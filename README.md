@@ -107,18 +107,32 @@ This project is deployed to AWS using **GitHub Actions**, implementing two diffe
 ## 🔄 Files Auto-Generated or Updated by GitHub Actions <a id="files-auto-generated-or-updated-by-github-actions"></a>
 
 Several files in this repository are **automatically generated or updated** as part of the CI/CD process using **GitHub Actions**.  
+If you're interested in how these work, check the workflow files here:  
 
-📌 [`deploy.yml`](./.github/workflows/deploy.yml) – Handles **EKS & MongoDB Deployment**  
-📌 [`AWS_severless.yml`](./.github/workflows/AWS_severless.yml) – Handles **App Runner & DynamoDB Deployment**  
+📌 [deploy.yml](./.github/workflows/deploy.yml) – Handles **EKS & MongoDB Deployment**  
+📌 [AWS_severless.yml](./.github/workflows/AWS_severless.yml) – Handles **App Runner & DynamoDB Deployment**  
 
 Below is a list of files that **should not be manually modified**, as they are dynamically updated by GitHub Actions:  
 
-| File | Updated in Workflow |
-|------|----------------------|
-| [`README.md`](./README.md) | `deploy.yml`, `AWS_severless.yml` |
-| [`giftwebsite/server.js`](./giftwebsite/server.js) | `AWS_severless.yml` |
-| [`giftlink-backend/.env`](./giftlink-backend/.env) | `AWS_severless.yml` |
-| [`giftlink-frontend/.env`](./giftlink-frontend/.env) | `deploy.yml`, `AWS_severless.yml` |
+| File | Updated in Workflow | Description |
+|------|----------------------|-------------|
+| [README.md](./README.md) | [deploy.yml](./.github/workflows/deploy.yml), [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Updates deployment links for AWS EKS (Method 1) and AWS App Runner (Method 2). |
+| [giftwebsite/server.js](./giftwebsite/server.js) | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Auto-generated Express server for proxying API requests in App Runner deployment. |
+| [giftwebsite/Dockerfile](./giftwebsite/Dockerfile) | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Builds the frontend container dynamically for App Runner. |
+| [giftlink-backend/.env](./giftlink-backend/.env) | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Injects environment variables for AWS DynamoDB. |
+| [giftlink-backend/util/import-mongo/.env](./giftlink-backend/util/import-mongo/.env) | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Generates environment variables for data import into DynamoDB. |
+| [giftlink-backend/models/db.js](./giftlink-backend/models/db.js) | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Dynamically updated to connect to AWS DynamoDB instead of MongoDB. |
+| [giftlink-backend/routes/authRoutes.js](./giftlink-backend/routes/authRoutes.js) | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Updated for authentication using DynamoDB instead of MongoDB. |
+| [giftlink-backend/routes/searchRoutes.js](./giftlink-backend/routes/searchRoutes.js) | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Modified to ensure search queries work properly with DynamoDB. |
+| [giftlink-backend/routes/giftRoutes.js](./giftlink-backend/routes/giftRoutes.js) | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Ensures correct CRUD operations for gifts using DynamoDB. |
+| [giftlink-frontend/src/config.js](./giftlink-frontend/src/config.js) | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Updates backendUrl dynamically based on AWS App Runner deployment. |
+| [giftlink-frontend/.env](./giftlink-frontend/.env) | [deploy.yml](./.github/workflows/deploy.yml), [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Injects correct backend API URL for the frontend. |
+| [kubernetes/deployment.yml](./kubernetes/deployment.yml) | [deploy.yml](./.github/workflows/deploy.yml) | Updates backend image paths for AWS EKS deployment. |
+| [kubernetes/giftwebsite-deployment.yml](./kubernetes/giftwebsite-deployment.yml) | [deploy.yml](./.github/workflows/deploy.yml) | Updates frontend image paths for AWS EKS deployment. |
+| **AWS App Runner Backend URL** | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Updates README.md with the backend deployment link for AWS App Runner. |
+| **AWS App Runner Frontend URL** | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Updates README.md with the frontend deployment link for AWS App Runner. |
+
+📌 **Note:** Do **not** manually edit these files. If you need to modify deployment behavior, update the relevant workflow files instead.
 
 ---
 
