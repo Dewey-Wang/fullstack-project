@@ -739,3 +739,15 @@ jobs:
 
           echo "✅ GIFTWEBSITE_URL: https://$GIFTWEBSITE_URL"
           echo "GIFTWEBSITE_URL=https://$GIFTWEBSITE_URL" >> $GITHUB_ENV
+      
+      - name: 🔄 Update README with App Runner Link
+        run: |
+          sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [https://$GIFTWEBSITE_URL](https://$GIFTWEBSITE_URL)|" README.md
+
+      - name: 📢 Commit Updated README
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add README.md
+          git commit -m "🔄 Updated README with App Runner deployment link"
+          git push
