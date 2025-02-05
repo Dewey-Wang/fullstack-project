@@ -392,7 +392,12 @@ jobs:
                       TableName: TABLE_GIFTS,
                       FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
                       ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0 ? expressionAttributeValues : undefined,
-                      ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
+                      ExpressionAttributeNames: {
+                          "#name": "name",
+                          "#category": "category",
+                          "#condition": "condition",
+                          "#description": "description"  // ✅ 正確定義 `#description`
+                      },
                       ProjectionExpression: "#name, #category, #condition, age_years, #description",
                   };
           
@@ -405,7 +410,7 @@ jobs:
                   res.status(500).json({ error: e.message });
               }
           });
-                  
+          
           module.exports = router;
 
           EOF
