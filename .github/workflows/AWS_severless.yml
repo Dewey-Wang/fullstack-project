@@ -741,25 +741,26 @@ jobs:
 
           echo "✅ GIFTWEBSITE_URL: https://$GIFTWEBSITE_URL"
           echo "GIFTWEBSITE_URL=https://$GIFTWEBSITE_URL" >> $GITHUB_ENV
-      
+
+      - name: 🔄 Stash Uncommitted Changes
+        run: |
+          git stash --include-untracked
+          
+      - name: 🔄 Pull Latest Changes
+        run: git pull --rebase
+
+      - name: 🔄 Restore Stashed Changes (Except README.md)
+        run: git stash pop || echo "No stash found"
+
+      - name: 🔄 Update README with Deployment Links
+        run: |
+          sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
+          sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [https://$GIFTWEBSITE_URL](https://$GIFTWEBSITE_URL)|" README.md
+
       - name: 📢 Commit Updated README
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          # 暫存所有未提交的變更，避免影響 pull
-          git stash --include-untracked
-
-          # 拉取最新變更，確保與遠端同步
-          git pull --rebase
-
-          # 恢復之前 stash 的變更
-          git stash pop || echo "No stashed changes to apply"
-
-          # Update "GiftLink App" link
-          sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
-          
-          # Update the App Runner deployment link under "Method 2"
-          sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [https://$GIFTWEBSITE_URL](https://$GIFTWEBSITE_URL)|" README.md
           git add README.md
           git commit -m "🔄 Updated README with App Runner deployment link"
           git push
