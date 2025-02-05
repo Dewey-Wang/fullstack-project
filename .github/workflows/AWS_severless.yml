@@ -123,7 +123,8 @@ jobs:
           const giftRoutes = require("./routes/giftRoutes");
           const authRoutes = require("./routes/authRoutes");
           const searchRoutes = require("./routes/searchRoutes");
-          
+          const { ScanCommand } = require("@aws-sdk/lib-dynamodb");
+
           const app = express();
           app.use(cors());
           app.use(express.json());
@@ -170,15 +171,16 @@ jobs:
           router.post("/register", async (req, res) => {
             try {
               const { email, firstName, lastName, password } = req.body;
-          
-              // 🔹 改用 `QueryCommand` 來查找 Email
+
+              // 檢查 email 是否已存在
               const existingUsers = await db.send(
-                new QueryCommand({
+                new ScanCommand({
                   TableName: TABLE_USERS,
-                  KeyConditionExpression: "email = :email",
+                  FilterExpression: "email = :email",
                   ExpressionAttributeValues: { ":email": email },
                 })
               );
+
           
               if (existingUsers.Items && existingUsers.Items.length > 0) {
                 return res.status(400).json({ error: "Email already exists" });
@@ -322,7 +324,6 @@ jobs:
       - name: 🔧 更新 `searchRoutes.js`
         run: |
           cat <<EOF > giftlink-backend/routes/searchRoutes.js
-          const express = require("express");
           const { db } = require("../models/db");
           const { ScanCommand } = require("@aws-sdk/lib-dynamodb");
           
@@ -347,13 +348,14 @@ jobs:
                 FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
                 ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0 ? expressionAttributeValues : undefined,
                 ExpressionAttributeNames: Object.keys(expressionAttributeNames).length > 0 ? expressionAttributeNames : undefined,
-                ProjectionExpression: "#name, category, condition, age_years",  // ✅ 加 ProjectionExpression
               };
+          
+              console.log("🔍 Searching with params:", JSON.stringify(params, null, 2));
           
               const gifts = await db.send(new ScanCommand(params));
               res.json(gifts.Items || []);
             } catch (e) {
-              console.error(e);
+              console.error("❌ Search Error:", e);
               res.status(500).json({ error: e.message });
             }
           });
@@ -403,6 +405,19 @@ jobs:
           else
             echo "✅ DynamoDB Table $TABLE_GIFTS 已存在"
           fi
+
+          aws dynamodb update-table \
+          --table-name giftapp-users \
+          --attribute-definitions AttributeName=email,AttributeType=S \
+          --global-secondary-index-updates '[
+            {
+              "Create": {
+                "IndexName": "email-index",
+                "KeySchema": [{"AttributeName": "email", "KeyType": "HASH"}],
+                "Projection": {"ProjectionType": "ALL"}
+              }
+            }
+          ]' --region us-east-1
 
       - name: 🔄 確保環境變數載入
         run: |
@@ -458,7 +473,8 @@ jobs:
                         \"DYNAMODB_TABLE\": \"giftapp-data\",
                         \"AWS_REGION\": \"us-east-1\",
                         \"AWS_ACCESS_KEY_ID\": \"${AWS_ACCESS_KEY_ID}\",
-                        \"AWS_SECRET_ACCESS_KEY\": \"${AWS_SECRET_ACCESS_KEY}\"
+                        \"AWS_SECRET_ACCESS_KEY\": \"${AWS_SECRET_ACCESS_KEY}\",
+                        \"JWT_SECRET\": \"mysecret"\
                       }
                     }
                   },
@@ -489,7 +505,8 @@ jobs:
                     \"DYNAMODB_TABLE\": \"giftapp-data\",
                     \"AWS_REGION\": \"us-east-1\",
                     \"AWS_ACCESS_KEY_ID\": \"${AWS_ACCESS_KEY_ID}\",
-                    \"AWS_SECRET_ACCESS_KEY\": \"${AWS_SECRET_ACCESS_KEY}\"
+                    \"AWS_SECRET_ACCESS_KEY\": \"${AWS_SECRET_ACCESS_KEY}\",
+                    \"JWT_SECRET\": \"mysecret"\
                   }
                 }
               },
