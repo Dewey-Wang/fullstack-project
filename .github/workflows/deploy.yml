@@ -237,7 +237,7 @@ jobs:
           git restore .
 
           # 2️⃣ 刪除未追蹤 (Untracked) 的檔案，確保乾淨的提交 (可選)
-          git clean -fd
+          git clean -fd -e README.md
 
       - name: 🔄 Update README with website Link
         run: |
