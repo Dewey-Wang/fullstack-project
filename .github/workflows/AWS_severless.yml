@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+  workflow_run:
+    workflows: ["Deploy to AWS"]  # 只有當 `deploy.yml` 成功後才執行
+    types:
+      - completed
 
 permissions:
   contents: write
