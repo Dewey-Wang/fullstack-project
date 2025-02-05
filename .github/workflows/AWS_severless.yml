@@ -755,53 +755,50 @@ jobs:
       
       - name: 🔄 Reset Unwanted Changes (Keep Only README.md)
         run: |
-          # 1️⃣ 還原未提交的修改，但保留 `README.md`
           git restore --staged .
           git restore .
+          git clean -fd -e README.md  # 確保不刪除 README.md
 
-          # 2️⃣ 刪除未追蹤 (Untracked) 的檔案，但不刪除 README.md
-          git clean -fd -e README.md
+      - name: 🔄 Pull Latest Changes (Handle Conflicts)
+        run: |
+          git fetch origin main
+          git reset --hard origin/main  # 確保本地與遠端同步
+          git clean -fd  # 確保本地目錄乾淨
 
       - name: 🔄 Update README with website Link
         run: |
           echo "🔍 檢查環境變數 GIFTWEBSITE_URL: $GIFTWEBSITE_URL"
 
-          # 確保 $Method_1 變數有值
           if [ -z "$GIFTWEBSITE_URL" ]; then
             echo "❌ ERROR: GIFTWEBSITE_URL is empty!"
             exit 1
           fi
 
-          # 確保 README.md 存在
           if [ ! -f "README.md" ]; then
             echo "❌ ERROR: README.md does not exist!"
             exit 1
           fi
 
-          # 直接用 echo 確保替換成功
           echo "🔄 Replacing URL in README.md..."
-          sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
-          sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [$GIFTWEBSITE_URL]($GIFTWEBSITE_URL)|" README.md
-          
-          # 檢查替換後的內容
           cat README.md | grep "🔗Link for Method 2" || echo "❌ ERROR: Replacement failed!"
 
       - name: 📢 Commit Updated README
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+          git pull --rebase origin main || (echo "⚠️ Merge conflict detected, aborting rebase" && git rebase --abort && exit 1)
+          sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
+          sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [$GIFTWEBSITE_URL]($GIFTWEBSITE_URL)|" README.md
 
-          # 只添加 README.md
           git add README.md
 
-          # 檢查是否真的有變更，避免空提交錯誤
           if git diff --cached --quiet; then
             echo "⚠️ No changes to commit in README.md"
             exit 0
           fi
 
           git commit -m "🔄 Updated README with App Runner deployment link"
-          git push
+          git push origin main
 
           
 
