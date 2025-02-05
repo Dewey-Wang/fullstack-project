@@ -7,7 +7,7 @@ GiftLink is a platform that allows users to share and receive gifts easily. The 
 ---
 
 ## Table of Contents
-- [🔧 Technology Overview](#technology-overview)
+- [🏗️ Technology Overview](#technology-overview)
   - [Backend - giftlink-backend](#backend---giftlink-backend)
   - [Frontend - giftlink-frontend and giftwebsite](#frontend---giftlink-frontend-and-giftwebsite)
 - [🚀 Deployment to AWS](#deployment-to-aws)
@@ -20,8 +20,7 @@ GiftLink is a platform that allows users to share and receive gifts easily. The 
 
 ---
 
-## 🔧 Technology Overview
-<!-- id="technology-overview" -->
+## 🏗️ Technology Overview <a id="technology-overview"></a>
 
 ### Backend - giftlink-backend
 <!-- id="backend---giftlink-backend" -->
@@ -87,8 +86,7 @@ The frontend is developed using **React.js** for UI components and **Bootstrap**
 
 ---
 
-## 🚀 Deployment to AWS
-<!-- id="deployment-to-aws" -->
+## 🚀 Deployment to AWS <a id="deployment-to-aws"></a>
 
 This project is deployed to AWS using **GitHub Actions**, implementing two different deployment strategies:
 
@@ -107,8 +105,7 @@ This project is deployed to AWS using **GitHub Actions**, implementing two diffe
 
 ---
 
-## 🔄 Files Auto-Generated or Updated by GitHub Actions
-<!-- id="files-auto-generated-or-updated-by-github-actions" -->
+## 🔄 Files Auto-Generated or Updated by GitHub Actions <a id="files-auto-generated-or-updated-by-github-actions"></a>
 
 Several files in this repository are **automatically generated or updated** as part of the CI/CD process using **GitHub Actions**.  
 
@@ -126,15 +123,13 @@ Below is a list of files that **should not be manually modified**, as they are d
 
 ---
 
-## 📝 Auto-Updating README with Deployment URL
-<!-- id="auto-updating-readme-with-deployment-url" -->
+## 📝 Auto-Updating README with Deployment URL <a id="auto-updating-readme-with-deployment-url"></a>
 
 At the end of the GitHub Actions `deploy.yml` and `AWS_severless.yml` workflow, the script fetches the **AWS App Runner service URL** and updates `README.md` automatically.
 
 ---
 
-## 💡 Contributing
-<!-- id="contributing" -->
+## 💡 Contributing <a id="contributing"></a>
 
 If you plan to contribute to this project, please note:
 - **Do NOT manually edit files that are auto-generated** by GitHub Actions.
@@ -142,8 +137,7 @@ If you plan to contribute to this project, please note:
 
 ---
 
-## 📩 Contact
-<!-- id="contact" -->
+## 📩 Contact <a id="contact"></a>
 
 If you have any questions, feel free to contact me at:
 
