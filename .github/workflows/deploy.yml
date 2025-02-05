@@ -257,7 +257,7 @@ jobs:
 
           # 直接用 echo 確保替換成功
           echo "🔄 Replacing URL in README.md..."
-          sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [http://$Method_1](http://$Method_1)|" README.md
+          sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [$Method_1]($Method_1)|" README.md
           
           # 檢查替換後的內容
           cat README.md | grep "🔗Link for Method 1" || echo "❌ ERROR: Replacement failed!"
