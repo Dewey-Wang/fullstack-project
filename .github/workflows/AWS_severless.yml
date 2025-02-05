@@ -151,6 +151,7 @@ jobs:
           EOF
       - name: 🔧 更新 `authRoutes.js`
         run: |
+          cat <<EOF > giftlink-backend/routes/authRoutes.js
           const express = require("express");
           const bcryptjs = require("bcryptjs");
           const jwt = require("jsonwebtoken");
