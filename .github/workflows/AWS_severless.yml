@@ -757,6 +757,16 @@ jobs:
           sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
           sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [https://$GIFTWEBSITE_URL](https://$GIFTWEBSITE_URL)|" README.md
 
+
+      - name: 🔄 Reset Unwanted Changes (Keep Only README.md)
+        run: |
+          # 1️⃣ 還原未提交的修改，確保 `README.md` 以外的變更不影響提交
+          git restore --staged .
+          git restore .
+
+          # 2️⃣ 刪除未追蹤 (Untracked) 的檔案，確保乾淨的提交 (可選)
+          git clean -fd
+          
       - name: 📢 Commit Updated README
         run: |
           git config --global user.name "github-actions"
