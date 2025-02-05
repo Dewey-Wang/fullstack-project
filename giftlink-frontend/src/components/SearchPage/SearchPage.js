@@ -31,9 +31,7 @@ function SearchPage() {
         fetchProducts();
     }, []);
 
-
     const handleSearch = async () => {
-        // Construct the search URL based on user input
         const baseUrl = `${urlConfig.backendUrl}/api/search?`;
         const queryParams = new URLSearchParams({
             name: searchQuery,
@@ -41,16 +39,18 @@ function SearchPage() {
             category: document.getElementById('categorySelect').value,
             condition: document.getElementById('conditionSelect').value,
         }).toString();
-
+    
         try {
             const response = await fetch(`${baseUrl}${queryParams}`);
             if (!response.ok) {
                 throw new Error('Search failed');
             }
             const data = await response.json();
-            setSearchResults(data);
+            console.log("🔍 Search Results:", data);  // ✅ 確保 API 有回傳數據
+            setSearchResults(data || []);  // ✅ 確保是陣列
         } catch (error) {
             console.error('Failed to fetch search results:', error);
+            setSearchResults([]);  // ✅ 確保發生錯誤時不會變成 undefined
         }
     };
 
@@ -109,9 +109,8 @@ function SearchPage() {
                     <button className="btn btn-primary" onClick={handleSearch}>Search</button>
                     <div className="search-results mt-4">
                         {searchResults.length > 0 ? (
-                            searchResults.map(product => (
+                            searchResults?.map(product => (
                                 <div key={product.id} className="card mb-3">
-                                    {/* Check if product has an image and display it */}
                                     <img src={product.image} alt={product.name} className="card-img-top" />
                                     <div className="card-body">
                                         <h5 className="card-title">{product.name}</h5>
@@ -123,11 +122,8 @@ function SearchPage() {
                                         </button>
                                     </div>
                                 </div>
-                            ))
-                        ) : (
-                            <div className="alert alert-info" role="alert">
-                                No products found. Please revise your filters.
-                            </div>
+                        )) || <div className="alert alert-info">No products found. Please revise your filters.
+                            </div>;
                         )}
                     </div>
                 </div>
