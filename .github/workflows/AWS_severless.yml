@@ -379,7 +379,7 @@ jobs:
                   "#name": "name",       // ✅ 修正 `name`
                   "#condition": "condition", // ✅ 修正 `condition`
                 },
-                ProjectionExpression: "#name, category, #condition, age_years",  // ✅ 修正 ProjectionExpression
+                ProjectionExpression: "#name, category, #condition, age_years, description",  // ✅ 修正 ProjectionExpression
               };
           
               console.log("🔍 Searching with params:", JSON.stringify(params, null, 2));
