@@ -393,13 +393,14 @@ jobs:
                       FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
                       ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0 ? expressionAttributeValues : undefined,
                       ExpressionAttributeNames: {
+                          "#id": "id", // ✅ 確保 `id` 被返回
                           "#name": "name",
                           "#category": "category",
                           "#condition": "condition",
                           "#description": "description",  // ✅ 正確定義 `#description`
                           "#image": "image"  // ✅ 確保 image 屬性可用
                       },
-                      ProjectionExpression: "#name, #category, #condition, age_years, #description, #image", // ✅ 加入 image
+                      ProjectionExpression: "#id, #name, #category, #condition, age_years, #description, #image", // ✅ 加入 id
                   };
 
           
