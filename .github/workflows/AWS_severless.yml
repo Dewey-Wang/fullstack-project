@@ -396,10 +396,12 @@ jobs:
                           "#name": "name",
                           "#category": "category",
                           "#condition": "condition",
-                          "#description": "description"  // ✅ 正確定義 `#description`
+                          "#description": "description",  // ✅ 正確定義 `#description`
+                          "#image": "image"  // ✅ 確保 image 屬性可用
                       },
-                      ProjectionExpression: "#name, #category, #condition, age_years, #description",
+                      ProjectionExpression: "#name, #category, #condition, age_years, #description, #image", // ✅ 加入 image
                   };
+
           
                   console.log("🔍 Searching with params:", JSON.stringify(params, null, 2));
           
