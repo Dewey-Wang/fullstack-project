@@ -13,7 +13,7 @@ GiftLink is a platform that allows users to share and receive gifts easily. The 
 - [Deployment to AWS](#deployment-to-aws)
   - [Method 1: Deploying with AWS EKS and MongoDB](#method-1-deploying-with-aws-eks-and-mongodb)
   - [Method 2: Deploying with AWS App Runner and DynamoDB](#method-2-deploying-with-aws-app-runner-and-dynamodb)
-- [Automated Files and GitHub Actions Workflows](#automated-files-and-github-actions-workflows)
+- [Files Auto-Generated or Updated by GitHub Actions](#files-auto-generated-or-updated-by-github-actions)
 - [Auto-Updating README with Deployment URL](#auto-updating-readme-with-deployment-url)
 - [Contributing](#contributing)
 - [Contact](#contact)
