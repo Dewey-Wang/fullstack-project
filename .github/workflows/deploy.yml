@@ -229,20 +229,8 @@ jobs:
 
           echo "✅ 你的 GiftWebsite 可在這裡訪問: http://$GIFTWEBSITE_URL"
           Method_1=$(kubectl get svc giftwebsite-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
-
-      - name: 🔄 Stash Uncommitted Changes (Avoid Conflicts)
-        run: git stash --include-untracked || echo "No changes to stash"
-
-      - name: 🔄 Pull Latest Changes (Ensure No Conflicts)
-        run: |
-          git fetch origin main
-          git reset --hard origin/main
-          git clean -fd  # 確保工作目錄乾淨
-
-      - name: 🔄 Restore Stashed Changes (Except README.md)
-        run: git stash pop || echo "No stash found"
-
-      - name: 🔄 Update README with Deployment Links
+ 
+      - name: 🔄 Update README with website Link
         run: |
           sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [http://$Method_1](http://$Method_1)|" README.md
 
@@ -250,6 +238,7 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          git add README.md  # 只添加 README.md
+          git add README.md
           git commit -m "🔄 Updated README with EKS deployment link"
-          git push origin main
+          git push
+          
