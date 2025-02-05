@@ -746,7 +746,15 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          git pull --rebase  # 先拉取最新變更，避免衝突
+          # 暫存所有未提交的變更，避免影響 pull
+          git stash --include-untracked
+
+          # 拉取最新變更，確保與遠端同步
+          git pull --rebase
+
+          # 恢復之前 stash 的變更
+          git stash pop || echo "No stashed changes to apply"
+
           # Update "GiftLink App" link
           sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
           
