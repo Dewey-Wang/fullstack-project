@@ -229,15 +229,12 @@ jobs:
           echo "✅ 你的 GiftWebsite 可在這裡訪問: http://$GIFTWEBSITE_URL"
           Method_1=$(kubectl get svc giftwebsite-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 
-      - name: 🔄 Update README with website Link
-        run: |
-          sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [http://$Method_1](http://$Method_1)|" README.md
-
       - name: 📢 Commit Updated README
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           git pull --rebase  # 先拉取最新變更，避免衝突
+          sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [http://$Method_1](http://$Method_1)|" README.md
           git add README.md
           git commit -m "🔄 Updated README with EKS deployment link"
           git push
