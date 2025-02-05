@@ -13,7 +13,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      
+    needs: deploy  # 這行確保 deploy.yml 先跑完
+
     steps:
       - name: 🚀 檢出程式碼
         uses: actions/checkout@v4
@@ -741,13 +742,15 @@ jobs:
 
           echo "✅ GIFTWEBSITE_URL: https://$GIFTWEBSITE_URL"
           echo "GIFTWEBSITE_URL=https://$GIFTWEBSITE_URL" >> $GITHUB_ENV
+      
+      - name: 🔄 Stash Uncommitted Changes (Avoid Conflicts)
+        run: git stash --include-untracked || echo "No changes to stash"
 
-      - name: 🔄 Stash Uncommitted Changes
+      - name: 🔄 Pull Latest Changes (Handle Conflicts)
         run: |
-          git stash --include-untracked
-          
-      - name: 🔄 Pull Latest Changes
-        run: git pull --rebase
+          git fetch origin main
+          git reset --hard origin/main
+          git clean -fd  # 確保工作目錄乾淨
 
       - name: 🔄 Restore Stashed Changes (Except README.md)
         run: git stash pop || echo "No stash found"
@@ -763,4 +766,4 @@ jobs:
           git config --global user.email "github-actions@github.com"
           git add README.md
           git commit -m "🔄 Updated README with App Runner deployment link"
-          git push
+          git push origin main
