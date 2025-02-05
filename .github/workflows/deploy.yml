@@ -228,7 +228,7 @@ jobs:
           fi
 
           echo "✅ 你的 GiftWebsite 可在這裡訪問: http://$GIFTWEBSITE_URL"
-          Method_1=$(kubectl get svc giftwebsite-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "Method_1=http://$GIFTWEBSITE_URL" >> $GITHUB_ENV
       
       - name: 🔄 Reset Unwanted Changes (Keep Only README.md)
         run: |
@@ -241,6 +241,8 @@ jobs:
 
       - name: 🔄 Update README with website Link
         run: |
+          echo "🔍 檢查環境變數 Method_1: $Method_1"
+
           # 確保 $Method_1 變數有值
           if [ -z "$Method_1" ]; then
             echo "❌ ERROR: Method_1 is empty!"
