@@ -1,5 +1,4 @@
 # [GiftLink App](https://dy6kdtagsb.us-east-1.awsapprunner.com)
-🔗 <a href="https://dy6kdtagsb.us-east-1.awsapprunner.com" target="_blank">**Go to Website**</a>
 
 ## Introduction
 GiftLink is a platform that allows users to share and receive gifts easily. The app consists of a **React.js frontend** and a **Node.js backend** deployed on AWS using different deployment methods. Users can browse available gifts, filter search results, and manage their gift listings with a seamless UI.
