@@ -742,19 +742,16 @@ jobs:
           echo "✅ GIFTWEBSITE_URL: https://$GIFTWEBSITE_URL"
           echo "GIFTWEBSITE_URL=https://$GIFTWEBSITE_URL" >> $GITHUB_ENV
       
-      - name: 🔄 Update README with App Runner Link
-        run: |
-          # Update "GiftLink App" link
-          sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
-          
-          # Update the App Runner deployment link under "Method 2"
-          sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [https://$GIFTWEBSITE_URL](https://$GIFTWEBSITE_URL)|" README.md
-
       - name: 📢 Commit Updated README
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
           git pull --rebase  # 先拉取最新變更，避免衝突
+          # Update "GiftLink App" link
+          sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
+          
+          # Update the App Runner deployment link under "Method 2"
+          sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [https://$GIFTWEBSITE_URL](https://$GIFTWEBSITE_URL)|" README.md
           git add README.md
           git commit -m "🔄 Updated README with App Runner deployment link"
           git push
