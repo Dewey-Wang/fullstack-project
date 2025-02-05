@@ -11,7 +11,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
+      
     steps:
       - name: 🚀 檢出程式碼
         uses: actions/checkout@v4
