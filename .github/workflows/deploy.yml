@@ -15,6 +15,8 @@ jobs:
     steps:
       - name: 🚀 檢出程式碼
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # ✅ 確保完整拉取，避免目錄不完整
 
       - name: 🔐 設定 AWS CLI
         uses: aws-actions/configure-aws-credentials@v2
@@ -25,7 +27,7 @@ jobs:
       
       - name: 🔧 更新 `/giftlink-frontend/src/components/MainPage/MainPage.js`
         run: |
-          cat <<EOF > /giftlink-frontend/src/components/MainPage/MainPage.js
+          cat <<EOF > giftlink-frontend/src/components/MainPage/MainPage.js
           import React, { useState, useEffect } from 'react';
           import { useNavigate } from 'react-router-dom';
           import {urlConfig} from '../../config';
