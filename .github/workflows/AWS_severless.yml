@@ -376,11 +376,13 @@ jobs:
                 FilterExpression: filterExpressions.length > 0 ? filterExpressions.join(" AND ") : undefined,
                 ExpressionAttributeValues: Object.keys(expressionAttributeValues).length > 0 ? expressionAttributeValues : undefined,
                 ExpressionAttributeNames: {
-                  "#name": "name",       // ✅ 修正 `name`
-                  "#condition": "condition", // ✅ 修正 `condition`
+                  "#name": "name",
+                  "#condition": "condition",
+                  "#description": "description"  // ✅ 修正 `description` 為保留字
                 },
-                ProjectionExpression: "#name, category, #condition, age_years, description",  // ✅ 修正 ProjectionExpression
+                ProjectionExpression: "#name, category, #condition, age_years, #description",  // ✅ 修正 ProjectionExpression
               };
+
           
               console.log("🔍 Searching with params:", JSON.stringify(params, null, 2));
           
