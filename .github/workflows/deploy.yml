@@ -232,16 +232,33 @@ jobs:
       
       - name: 🔄 Reset Unwanted Changes (Keep Only README.md)
         run: |
-          # 1️⃣ 還原未提交的修改，確保 `README.md` 以外的變更不影響提交
+          # 1️⃣ 還原未提交的修改，但保留 `README.md`
           git restore --staged .
           git restore .
 
-          # 2️⃣ 刪除未追蹤 (Untracked) 的檔案，確保乾淨的提交 (可選)
+          # 2️⃣ 刪除未追蹤 (Untracked) 的檔案，但不刪除 README.md
           git clean -fd -e README.md
 
       - name: 🔄 Update README with website Link
         run: |
+          # 確保 $Method_1 變數有值
+          if [ -z "$Method_1" ]; then
+            echo "❌ ERROR: Method_1 is empty!"
+            exit 1
+          fi
+
+          # 確保 README.md 存在
+          if [ ! -f "README.md" ]; then
+            echo "❌ ERROR: README.md does not exist!"
+            exit 1
+          fi
+
+          # 直接用 echo 確保替換成功
+          echo "🔄 Replacing URL in README.md..."
           sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [http://$Method_1](http://$Method_1)|" README.md
+          
+          # 檢查替換後的內容
+          cat README.md | grep "🔗Link for Method 1" || echo "❌ ERROR: Replacement failed!"
 
       - name: 📢 Commit Updated README
         run: |
@@ -259,6 +276,5 @@ jobs:
 
           git commit -m "🔄 Updated README with EKS deployment link"
           git push
-
 
           
