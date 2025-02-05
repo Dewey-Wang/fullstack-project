@@ -22,8 +22,8 @@ GiftLink is a platform that allows users to share and receive gifts easily. The 
 
 ## 🏗️ Technology Overview <a id="technology-overview"></a>
 
-### Backend - giftlink-backend
-<!-- id="backend---giftlink-backend" -->
+### Backend - giftlink-backend <a id="backend---giftlink-backend"></a>
+
 The backend is built using **Node.js** and **Express.js** to create APIs, with **AWS DynamoDB** or **MongoDB** as the database, depending on the deployment method.
 
 #### Architecture
@@ -55,8 +55,8 @@ The backend is built using **Node.js** and **Express.js** to create APIs, with *
 
 ---
 
-### Frontend - giftlink-frontend and giftwebsite
-<!-- id="frontend---giftlink-frontend-and-giftwebsite" -->
+### Frontend - giftlink-frontend and giftwebsite <a id="frontend---giftlink-frontend-and-giftwebsite"></a>
+
 The frontend is developed using **React.js** for UI components and **Bootstrap** for styling. **React Router** is used for managing page navigation.
 
 #### Architecture
@@ -90,11 +90,11 @@ The frontend is developed using **React.js** for UI components and **Bootstrap**
 
 This project is deployed to AWS using **GitHub Actions**, implementing two different deployment strategies:
 
-1. **Method 1: Deploying with AWS EKS and MongoDB**
+1. **Method 1: Deploying with AWS EKS and MongoDB** <a id="method-1-deploying-with-aws-eks-and-mongodb"></a>
    
 🔗Link for Method 1: *(Auto-updated by GitHub Actions)*
    
-2. **Method 2: Deploying with AWS App Runner and DynamoDB**
+2. **Method 2: Deploying with AWS App Runner and DynamoDB** <a id="method-2-deploying-with-aws-app-runner-and-dynamodb"></a>
    
 🔗Link for Method 2: *(Auto-updated by GitHub Actions)*
 
