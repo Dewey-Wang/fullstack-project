@@ -229,16 +229,35 @@ jobs:
 
           echo "✅ 你的 GiftWebsite 可在這裡訪問: http://$GIFTWEBSITE_URL"
           Method_1=$(kubectl get svc giftwebsite-service -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
- 
+      
       - name: 🔄 Update README with website Link
         run: |
           sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [http://$Method_1](http://$Method_1)|" README.md
+
+      - name: 🔄 Reset Unwanted Changes (Keep Only README.md)
+        run: |
+          # 1️⃣ 還原未提交的修改，確保 `README.md` 以外的變更不影響提交
+          git restore --staged .
+          git restore .
+
+          # 2️⃣ 刪除未追蹤 (Untracked) 的檔案，確保乾淨的提交 (可選)
+          git clean -fd
 
       - name: 📢 Commit Updated README
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
+
+          # 只添加 README.md
           git add README.md
+
+          # 檢查是否真的有變更，避免空提交錯誤
+          if git diff --cached --quiet; then
+            echo "⚠️ No changes to commit in README.md"
+            exit 0
+          fi
+
           git commit -m "🔄 Updated README with EKS deployment link"
           git push
+
           
