@@ -7,25 +7,24 @@ function MainPage() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        // Task 1: Write async fetch operation
-        // fetch all gifts
         const fetchGifts = async () => {
             try {
-                let url = `${urlConfig.backendUrl}/api/gifts`
+                let url = `${urlConfig.backendUrl}/api/gifts`;
                 const response = await fetch(url);
                 if (!response.ok) {
-                    //something went wrong
-                    throw new Error(`HTTP error; ${response.status}`)
+                    throw new Error(`HTTP error; ${response.status}`);
                 }
                 const data = await response.json();
-                setGifts(data);
+                setGifts(Array.isArray(data.gifts) ? data.gifts : []);  // ✅ 確保 `gifts` 是陣列
             } catch (error) {
-                console.log('Fetch error: ' + error.message);
+                console.error('❌ Fetch error:', error);
+                setGifts([]);  // ✅ 若錯誤發生，設為空陣列
             }
         };
-
+    
         fetchGifts();
     }, []);
+
 
     // Task 2: Navigate to details page
     const goToDetailsPage = (productId) => {
