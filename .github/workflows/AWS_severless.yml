@@ -40,6 +40,9 @@ jobs:
           DYNAMODB_TABLE=giftapp-data
           DATASRC=gifts.json
           EOF
+          echo $DYNAMODB_TABLE
+          export DYNAMODB_TABLE="giftapp-data"
+
       - name: 🔧 確保 `.env` 設置 `DYNAMODB_TABLE`
         run: |
           cat <<EOF > giftlink-backend/.env
@@ -249,15 +252,17 @@ jobs:
           const express = require("express");
           const { db } = require("../models/db");
           const { ScanCommand, PutCommand, GetCommand } = require("@aws-sdk/lib-dynamodb");
-          const { v4: uuidv4 } = require("uuid");  // ✅ 新增 UUID 產生器
+          const { v4: uuidv4 } = require("uuid");
           
           const router = express.Router();
-          const TABLE_GIFTS = "giftapp-data";
+          const TABLE_GIFTS = process.env.DYNAMODB_TABLE || "giftapp-data";
           
           // 📌 取得所有禮物 (支持分頁)
           router.get("/", async (req, res) => {
             try {
+              console.log("📌 Fetching all gifts from", TABLE_GIFTS);
               let params = { TableName: TABLE_GIFTS };
+          
               if (req.query.lastKey) {
                 params.ExclusiveStartKey = JSON.parse(req.query.lastKey);
               }
@@ -269,6 +274,7 @@ jobs:
                 lastKey: data.LastEvaluatedKey ? JSON.stringify(data.LastEvaluatedKey) : null,
               });
             } catch (error) {
+              console.error("❌ Error fetching gifts:", error);
               res.status(500).json({ error: error.message });
             }
           });
@@ -276,6 +282,7 @@ jobs:
           // 📌 取得單一禮物
           router.get("/:id", async (req, res) => {
             try {
+              console.log("📌 Fetching gift with ID:", req.params.id);
               const data = await db.send(new GetCommand({ TableName: TABLE_GIFTS, Key: { id: req.params.id } }));
           
               if (!data.Item) {
@@ -283,6 +290,7 @@ jobs:
               }
               res.json(data.Item);
             } catch (error) {
+              console.error("❌ Error fetching gift:", error);
               res.status(500).json({ error: error.message });
             }
           });
@@ -290,20 +298,25 @@ jobs:
           // 📌 新增禮物
           router.post("/", async (req, res) => {
             try {
+              console.log("📌 Adding new gift...");
               const gift = {
-                id: uuidv4(),  // ✅ 使用 UUID 產生唯一 ID
+                id: uuidv4(), // ✅ 使用 UUID 產生唯一 ID
                 ...req.body,
                 createdAt: new Date().toISOString(),
               };
           
               await db.send(new PutCommand({ TableName: TABLE_GIFTS, Item: gift }));
+              console.log("✅ Gift added:", gift);
+          
               res.json({ message: "Gift added!", gift });
             } catch (error) {
+              console.error("❌ Error adding gift:", error);
               res.status(500).json({ error: error.message });
             }
           });
           
           module.exports = router;
+
           EOF
           
       - name: 🔧 更新 `searchRoutes.js`
