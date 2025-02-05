@@ -129,8 +129,6 @@ Below is a list of files that **should not be manually modified**, as they are d
 | [giftlink-frontend/.env](./giftlink-frontend/.env) | [deploy.yml](./.github/workflows/deploy.yml), [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Injects correct backend API URL for the frontend. |
 | [kubernetes/deployment.yml](./kubernetes/deployment.yml) | [deploy.yml](./.github/workflows/deploy.yml) | Updates backend image paths for AWS EKS deployment. |
 | [kubernetes/giftwebsite-deployment.yml](./kubernetes/giftwebsite-deployment.yml) | [deploy.yml](./.github/workflows/deploy.yml) | Updates frontend image paths for AWS EKS deployment. |
-| **AWS App Runner Backend URL** | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Updates README.md with the backend deployment link for AWS App Runner. |
-| **AWS App Runner Frontend URL** | [AWS_severless.yml](./.github/workflows/AWS_severless.yml) | Updates README.md with the frontend deployment link for AWS App Runner. |
 
 📌 **Note:** Do **not** manually edit these files. If you need to modify deployment behavior, update the relevant workflow files instead.
 
