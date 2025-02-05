@@ -406,19 +406,6 @@ jobs:
             echo "✅ DynamoDB Table $TABLE_GIFTS 已存在"
           fi
 
-          aws dynamodb update-table \
-          --table-name giftapp-users \
-          --attribute-definitions AttributeName=email,AttributeType=S \
-          --global-secondary-index-updates '[
-            {
-              "Create": {
-                "IndexName": "email-index",
-                "KeySchema": [{"AttributeName": "email", "KeyType": "HASH"}],
-                "Projection": {"ProjectionType": "ALL"}
-              }
-            }
-          ]' --region us-east-1
-
       - name: 🔄 確保環境變數載入
         run: |
           set -a  # 讓 `export` 變數自動適用
