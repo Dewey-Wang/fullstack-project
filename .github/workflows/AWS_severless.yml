@@ -167,20 +167,24 @@ jobs:
           const JWT_SECRET = process.env.JWT_SECRET;
           const TABLE_USERS = "giftapp-users";
           
+          // 📌 測試 `/api/auth` 是否運行
+          router.get("/", (req, res) => {
+            res.json({ message: "Auth API is working!" });
+          });
+          
           // 📌 註冊用戶
           router.post("/register", async (req, res) => {
             try {
               const { email, firstName, lastName, password } = req.body;
-
-              // 檢查 email 是否已存在
+          
+              // 🔹 查找 Email 是否已存在
               const existingUsers = await db.send(
-                new ScanCommand({
+                new QueryCommand({
                   TableName: TABLE_USERS,
-                  FilterExpression: "email = :email",
+                  KeyConditionExpression: "email = :email",
                   ExpressionAttributeValues: { ":email": email },
                 })
               );
-
           
               if (existingUsers.Items && existingUsers.Items.length > 0) {
                 return res.status(400).json({ error: "Email already exists" });
@@ -188,7 +192,7 @@ jobs:
           
               const salt = await bcryptjs.genSalt(10);
               const hashedPassword = await bcryptjs.hash(password, salt);
-              const userId = uuidv4();  // ✅ 使用 UUID 產生唯一 ID
+              const userId = uuidv4(); // ✅ 使用 UUID 產生唯一 ID
           
               await db.send(
                 new PutCommand({
@@ -207,7 +211,7 @@ jobs:
               const authtoken = jwt.sign({ userId }, JWT_SECRET);
               res.json({ authtoken, email });
             } catch (e) {
-              console.error(e);
+              console.error("❌ Error in register:", e);
               res.status(500).json({ error: "Internal Server Error" });
             }
           });
@@ -217,7 +221,7 @@ jobs:
             try {
               const { email, password } = req.body;
           
-              // 🔹 改用 `QueryCommand` 來查找 Email
+              // 🔹 查找 Email
               const users = await db.send(
                 new QueryCommand({
                   TableName: TABLE_USERS,
@@ -239,13 +243,12 @@ jobs:
               const authtoken = jwt.sign({ userId: theUser.id }, JWT_SECRET);
               res.json({ authtoken, userName: theUser.firstName, userEmail: theUser.email });
             } catch (e) {
-              console.error(e);
+              console.error("❌ Error in login:", e);
               res.status(500).json({ error: "Internal Server Error" });
             }
           });
           
           module.exports = router;
-
           EOF
 
       - name: 🔧 更新 `giftRoutes.js`
