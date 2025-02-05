@@ -21,7 +21,7 @@ GiftLink is a platform that allows users to share and receive gifts easily. The 
 
 ## Technology Overview
 
-### 🔹 Backend - giftlink-backend
+### Backend - giftlink-backend
 The backend is built using **Node.js** and **Express.js** to create APIs, with **AWS DynamoDB** or **MongoDB** as the database, depending on the deployment method.
 
 #### Architecture
@@ -53,7 +53,7 @@ The backend is built using **Node.js** and **Express.js** to create APIs, with *
 
 ---
 
-### 🔹 Frontend - giftlink-frontend and giftwebsite
+### Frontend - giftlink-frontend and giftwebsite
 The frontend is developed using **React.js** for UI components and **Bootstrap** for styling. **React Router** is used for managing page navigation.
 
 #### Architecture
