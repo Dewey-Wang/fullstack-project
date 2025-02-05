@@ -233,7 +233,14 @@ jobs:
         run: |
           git config --global user.name "github-actions"
           git config --global user.email "github-actions@github.com"
-          git pull --rebase  # 先拉取最新變更，避免衝突
+          # 暫存所有未提交的變更，避免影響 pull
+          git stash --include-untracked
+
+          # 拉取最新變更，確保與遠端同步
+          git pull --rebase
+
+          # 恢復之前 stash 的變更
+          git stash pop || echo "No stashed changes to apply"
           sed -i "s|🔗Link for Method 1:.*|🔗Link for Method 1: [http://$Method_1](http://$Method_1)|" README.md
           git add README.md
           git commit -m "🔄 Updated README with EKS deployment link"
