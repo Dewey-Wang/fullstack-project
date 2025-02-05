@@ -742,6 +742,13 @@ jobs:
       
       - name: 🔄 Update README with App Runner Link
         run: |
+          # Update "GiftLink App" link
+          sed -i "s|# \[GiftLink App\](.*)|# [GiftLink App]($GIFTWEBSITE_URL)|" README.md
+          
+          # Update "Go to Website" link
+          sed -i "s|🔗 <a href=\".*\" target=\"_blank\">|🔗 <a href=\"$GIFTWEBSITE_URL\" target=\"_blank\">|" README.md
+
+          # Update the App Runner deployment link under "Method 2"
           sed -i "s|🔗Link for Method 2:.*|🔗Link for Method 2: [https://$GIFTWEBSITE_URL](https://$GIFTWEBSITE_URL)|" README.md
 
       - name: 📢 Commit Updated README
