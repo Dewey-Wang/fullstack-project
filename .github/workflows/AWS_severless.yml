@@ -492,8 +492,8 @@ jobs:
           docker buildx create --use
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64,linux/arm64 \
-            -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest \
-            --push ./giftlink-backend
+            -t 713881787822.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest \
+            --push ./giftlink-backend 
             
       - name: ⏹️ 檢查並更新或創建 giftapp-backend 的 App Runner 服務
         run: |
@@ -519,7 +519,7 @@ jobs:
                 --service-arn "$SERVICE_ARN" \
                 --source-configuration "{
                   \"ImageRepository\": {
-                    \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
+                    \"ImageIdentifier\": \"713881787822.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
                     \"ImageRepositoryType\": \"ECR\",
                     \"ImageConfiguration\": {
                       \"Port\": \"3060\",
@@ -533,7 +533,7 @@ jobs:
                     }
                   },
                   \"AuthenticationConfiguration\": {
-                    \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
+                    \"AccessRoleArn\": \"arn:aws:iam::713881787822:role/AppRunnerECRAccess\"
                   }
                 }" \
                 --region us-east-1
@@ -551,7 +551,7 @@ jobs:
             --service-name giftapp-backend \
             --source-configuration "{
               \"ImageRepository\": {
-                \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
+                \"ImageIdentifier\": \"713881787822.dkr.ecr.us-east-1.amazonaws.com/giftapp-backend:latest\",
                 \"ImageRepositoryType\": \"ECR\",
                 \"ImageConfiguration\": {
                   \"Port\": \"3060\",
@@ -565,7 +565,7 @@ jobs:
                 }
               },
               \"AuthenticationConfiguration\": {
-                \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
+                \"AccessRoleArn\": \"arn:aws:iam::713881787822:role/AppRunnerECRAccess\"
               }
             }" \
             --region us-east-1
@@ -689,7 +689,7 @@ jobs:
           docker buildx create --use
           docker buildx inspect --bootstrap
           docker buildx build --platform linux/amd64,linux/arm64 \
-            -t 253490795451.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest \
+            -t 713881787822.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest \
             --build-arg BACKEND_URL=${{ env.BACKEND_URL }} \
             --push ./giftwebsite
 
@@ -703,7 +703,7 @@ jobs:
                 --service-name giftwebsite \
                 --source-configuration "{
                   \"ImageRepository\": {
-                    \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest\",
+                    \"ImageIdentifier\": \"713881787822.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest\",
                     \"ImageRepositoryType\": \"ECR\",
                     \"ImageConfiguration\": {
                       \"Port\": \"9000\",
@@ -713,7 +713,7 @@ jobs:
                     }
                   },
                   \"AuthenticationConfiguration\": {
-                    \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
+                    \"AccessRoleArn\": \"arn:aws:iam::713881787822:role/AppRunnerECRAccess\"
                   }
                 }" \
                 --region ${{ secrets.AWS_REGION }}
@@ -723,7 +723,7 @@ jobs:
                 --service-arn "$SERVICE_ARN" \
                 --source-configuration "{
                   \"ImageRepository\": {
-                    \"ImageIdentifier\": \"253490795451.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest\",
+                    \"ImageIdentifier\": \"713881787822.dkr.ecr.us-east-1.amazonaws.com/giftwebsite:latest\",
                     \"ImageRepositoryType\": \"ECR\",
                     \"ImageConfiguration\": {
                       \"Port\": \"9000\",
@@ -733,7 +733,7 @@ jobs:
                     }
                   },
                   \"AuthenticationConfiguration\": {
-                    \"AccessRoleArn\": \"arn:aws:iam::253490795451:role/AppRunnerECRAccess\"
+                    \"AccessRoleArn\": \"arn:aws:iam::713881787822:role/AppRunnerECRAccess\"
                   }
                 }" \
                 --region ${{ secrets.AWS_REGION }}
