@@ -1,4 +1,4 @@
-# [GiftLink App](https://dy6kdtagsb.us-east-1.awsapprunner.com)
+# [GiftLink App](https://hzcnnmwjd5.us-east-1.awsapprunner.com)
 
 ## Introduction
 GiftLink is a platform that allows users to share and receive gifts easily. The app consists of a **React.js frontend** and a **Node.js backend** deployed on AWS using different deployment methods. Users can browse available gifts, filter search results, and manage their gift listings with a seamless UI.
@@ -95,7 +95,7 @@ This project is deployed to AWS using **GitHub Actions**, implementing two diffe
    
 2. **Method 2: Deploying with AWS App Runner and DynamoDB** <a id="method-2-deploying-with-aws-app-runner-and-dynamodb"></a>
    
-🔗Link for Method 2: [https://dy6kdtagsb.us-east-1.awsapprunner.com](https://dy6kdtagsb.us-east-1.awsapprunner.com)
+🔗Link for Method 2: [https://hzcnnmwjd5.us-east-1.awsapprunner.com](https://hzcnnmwjd5.us-east-1.awsapprunner.com)
 
 📌 **How Deployment Links Are Updated**
 - The **GitHub Actions workflow automatically updates the correct URLs** inside this README.
