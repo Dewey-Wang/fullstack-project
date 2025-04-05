@@ -1,5 +1,5 @@
-# [GiftLink App](https://hzcnnmwjd5.us-east-1.awsapprunner.com)
-
+# [GiftLink App](https://hzcnnmwjd5.us-east-1.awsapprunner.com) 
+NOTE: Currently, I shut down the AWS deployment. If you are interesting to see the live demo website, please send me a message in Issue section or send me an [email](deweywang2000@gmail.com).
 ## Introduction
 GiftLink is a platform that allows users to share and receive gifts easily. The app consists of a **React.js frontend** and a **Node.js backend** deployed on AWS using different deployment methods. Users can browse available gifts, filter search results, and manage their gift listings with a seamless UI.
 
